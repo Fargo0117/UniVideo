@@ -1,9 +1,9 @@
 <script setup>
 /**
  * 视频上传页面组件
- * 提供视频上传功能，包含表单验证和文件上传
+ * 提供视频上传功能，包含表单验证、文件上传和视频截取封面功能
  */
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/api'
 
@@ -22,6 +22,14 @@ const categories = ref([])
 // 文件名显示
 const videoFileName = ref('')
 const coverFileName = ref('')
+
+// 视频预览相关
+const videoPreviewUrl = ref('')  // 视频预览URL
+const videoRef = ref(null)        // video元素引用
+
+// 封面预览相关
+const coverPreviewUrl = ref('')   // 封面预览URL
+const isCaptured = ref(false)     // 是否为截取的封面
 
 // 加载状态
 const loading = ref(false)
@@ -45,24 +53,90 @@ const fetchCategories = async () => {
 
 /**
  * 处理视频文件选择
+ * 选择视频后生成预览URL用于播放器展示
  */
 const handleVideoChange = (event) => {
   const file = event.target.files[0]
   if (file) {
     videoFile.value = file
     videoFileName.value = file.name
+    
+    // 释放之前的预览URL（防止内存泄漏）
+    if (videoPreviewUrl.value) {
+      URL.revokeObjectURL(videoPreviewUrl.value)
+    }
+    
+    // 生成新的视频预览URL
+    videoPreviewUrl.value = URL.createObjectURL(file)
   }
 }
 
 /**
  * 处理封面文件选择
+ * 手动选择封面会覆盖截取的封面
  */
 const handleCoverChange = (event) => {
   const file = event.target.files[0]
   if (file) {
     coverFile.value = file
     coverFileName.value = file.name
+    isCaptured.value = false  // 标记为非截取
+    
+    // 释放之前的预览URL
+    if (coverPreviewUrl.value) {
+      URL.revokeObjectURL(coverPreviewUrl.value)
+    }
+    
+    // 生成封面预览URL
+    coverPreviewUrl.value = URL.createObjectURL(file)
   }
+}
+
+/**
+ * 从视频截取当前帧作为封面
+ * 使用 Canvas API 抓取视频画面并转换为图片文件
+ */
+const captureFrame = () => {
+  const videoEl = videoRef.value
+  
+  // 检查视频元素是否存在且已加载
+  if (!videoEl || videoEl.readyState < 2) {
+    alert('请等待视频加载完成后再截取')
+    return
+  }
+  
+  // 创建 Canvas 元素
+  const canvas = document.createElement('canvas')
+  canvas.width = videoEl.videoWidth
+  canvas.height = videoEl.videoHeight
+  
+  // 在 Canvas 上绘制当前视频帧
+  const ctx = canvas.getContext('2d')
+  ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height)
+  
+  // 将 Canvas 内容转换为 Blob
+  canvas.toBlob((blob) => {
+    if (!blob) {
+      alert('截取失败，请重试')
+      return
+    }
+    
+    // 将 Blob 转换为 File 对象（模拟上传文件）
+    const file = new File([blob], 'cover_snapshot.jpg', { type: 'image/jpeg' })
+    
+    // 更新封面文件
+    coverFile.value = file
+    coverFileName.value = '已截取: cover_snapshot.jpg'
+    isCaptured.value = true  // 标记为截取的封面
+    
+    // 释放之前的预览URL
+    if (coverPreviewUrl.value) {
+      URL.revokeObjectURL(coverPreviewUrl.value)
+    }
+    
+    // 生成预览图URL
+    coverPreviewUrl.value = URL.createObjectURL(blob)
+  }, 'image/jpeg', 0.9)  // JPEG格式，90%质量
 }
 
 /**
@@ -138,6 +212,16 @@ const goBack = () => {
 onMounted(() => {
   fetchCategories()
 })
+
+// 页面卸载时释放预览URL，防止内存泄漏
+onUnmounted(() => {
+  if (videoPreviewUrl.value) {
+    URL.revokeObjectURL(videoPreviewUrl.value)
+  }
+  if (coverPreviewUrl.value) {
+    URL.revokeObjectURL(coverPreviewUrl.value)
+  }
+})
 </script>
 
 <template>
@@ -210,6 +294,28 @@ onMounted(() => {
           <span class="hint">支持格式：mp4, avi, mov, mkv, flv, wmv</span>
         </div>
 
+        <!-- 视频预览区域（选择视频后显示） -->
+        <div v-if="videoPreviewUrl" class="form-group">
+          <label>视频预览 <span class="hint-inline">（拖动进度条选择封面画面）</span></label>
+          <div class="video-preview-container">
+            <video 
+              ref="videoRef"
+              :src="videoPreviewUrl" 
+              controls
+              class="video-preview"
+            >
+              您的浏览器不支持视频播放
+            </video>
+            <button 
+              type="button" 
+              class="capture-btn"
+              @click="captureFrame"
+            >
+              📷 截取当前帧作为封面
+            </button>
+          </div>
+        </div>
+
         <!-- 封面图片选择 -->
         <div class="form-group">
           <label>封面图片 <span class="required">*</span></label>
@@ -221,11 +327,17 @@ onMounted(() => {
               id="cover-file"
             />
             <label for="cover-file" class="file-input-label">
-              <span v-if="coverFileName">{{ coverFileName }}</span>
-              <span v-else>点击选择封面图片</span>
+              <span v-if="coverFileName" :class="{ 'captured-text': isCaptured }">{{ coverFileName }}</span>
+              <span v-else>点击选择封面图片（或从视频截取）</span>
             </label>
           </div>
-          <span class="hint">支持格式：jpg, jpeg, png, gif, webp</span>
+          <span class="hint">支持格式：jpg, jpeg, png, gif, webp；也可以从上方视频截取</span>
+          
+          <!-- 封面预览（截取或手动选择后显示） -->
+          <div v-if="coverPreviewUrl" class="cover-preview-container">
+            <img :src="coverPreviewUrl" alt="封面预览" class="cover-preview" />
+            <span v-if="isCaptured" class="capture-badge">已截取</span>
+          </div>
         </div>
 
         <!-- 提交按钮 -->
@@ -363,6 +475,78 @@ onMounted(() => {
   margin-top: 4px;
   font-size: 12px;
   color: #999;
+}
+
+.hint-inline {
+  font-size: 12px;
+  color: #999;
+  font-weight: normal;
+}
+
+/* 视频预览区域 */
+.video-preview-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.video-preview {
+  width: 100%;
+  max-height: 300px;
+  border-radius: 8px;
+  background: #000;
+}
+
+/* 截取封面按钮 */
+.capture-btn {
+  padding: 12px 20px;
+  background-color: #409eff;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.capture-btn:hover {
+  background-color: #66b1ff;
+}
+
+/* 封面预览区域 */
+.cover-preview-container {
+  position: relative;
+  margin-top: 12px;
+  display: inline-block;
+}
+
+.cover-preview {
+  max-width: 200px;
+  max-height: 150px;
+  border-radius: 8px;
+  border: 2px solid #67c23a;
+  object-fit: cover;
+}
+
+.capture-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #67c23a;
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.captured-text {
+  color: #67c23a;
+  font-weight: 500;
 }
 
 /* 提交按钮 */
