@@ -174,19 +174,31 @@ def upload_video():
 def get_video_list():
     """
     获取视频列表（仅已发布状态）
-    参数: category_id (可选，用于分类筛选)
+    参数: 
+    - keyword (可选，搜索关键词，模糊查询标题)
+    - category_id (可选，用于分类筛选)
     返回: 视频列表（包含作者昵称、分类名、封面URL）
     """
     try:
-        # 获取可选的分类筛选参数
-        category_id = request.args.get('category_id', type=int)
+        # 获取搜索关键词和分类筛选参数
+        keyword = request.args.get('keyword', '').strip()
+        category_id = request.args.get('category_id', '').strip()
         
-        # 构建查询：只查询 status=1 (已发布) 的视频
+        # 基础查询：只查询 status=1 (已发布) 的视频
         query = Video.query.filter_by(status=Video.STATUS_PUBLISHED)
         
-        # 如果提供了分类ID，则按分类筛选
-        if category_id:
-            query = query.filter_by(category_id=category_id)
+        # 如果提供了搜索关键词，则进行模糊搜索
+        if keyword:
+            query = query.filter(Video.title.like(f'%{keyword}%'))
+        
+        # 如果提供了分类ID且不是 'all'，则按分类筛选
+        if category_id and category_id != 'all':
+            try:
+                category_id_int = int(category_id)
+                query = query.filter_by(category_id=category_id_int)
+            except ValueError:
+                # 如果 category_id 无法转换为整数，忽略此筛选
+                pass
         
         # 按上传时间倒序排列
         videos = query.order_by(Video.created_at.desc()).all()

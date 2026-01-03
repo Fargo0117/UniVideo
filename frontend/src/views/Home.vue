@@ -1,7 +1,7 @@
 <script setup>
 /**
  * 首页组件
- * 展示视频列表，提供导航功能
+ * 展示视频列表，提供导航、搜索和分类筛选功能
  */
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
@@ -13,6 +13,14 @@ const router = useRouter()
 const videos = ref([])
 const loading = ref(true)
 
+// 分类数据
+const categories = ref([])
+const categoriesLoading = ref(false)
+
+// 搜索和筛选状态
+const searchKeyword = ref('')  // 搜索关键词
+const activeCategoryId = ref('all')  // 当前选中的分类ID
+
 // 从 localStorage 获取当前用户信息
 const nickname = ref(localStorage.getItem('nickname') || '用户')
 const userRole = ref(localStorage.getItem('role') || 'user')
@@ -21,14 +29,38 @@ const userRole = ref(localStorage.getItem('role') || 'user')
 const isAdmin = ref(userRole.value === 'admin')
 
 /**
- * 获取视频列表
- * 调用后端接口获取已发布的视频
+ * 获取分类列表
+ */
+const fetchCategories = async () => {
+  categoriesLoading.value = true
+  try {
+    const response = await api.get('/videos/categories')
+    categories.value = response.data.data || []
+  } catch (error) {
+    console.error('获取分类列表失败:', error)
+    categories.value = []
+  } finally {
+    categoriesLoading.value = false
+  }
+}
+
+/**
+ * 获取视频列表（带搜索和筛选功能）
  */
 const fetchVideos = async () => {
   loading.value = true
   try {
-    // 后端接口路径是 /videos/list
-    const response = await api.get('/videos/list')
+    // 构建请求参数
+    const params = {}
+    if (searchKeyword.value.trim()) {
+      params.keyword = searchKeyword.value.trim()
+    }
+    if (activeCategoryId.value && activeCategoryId.value !== 'all') {
+      params.category_id = activeCategoryId.value
+    }
+    
+    // 调用后端接口
+    const response = await api.get('/videos/list', { params })
     videos.value = response.data.data || []
   } catch (error) {
     console.error('获取视频列表失败:', error)
@@ -36,6 +68,21 @@ const fetchVideos = async () => {
   } finally {
     loading.value = false
   }
+}
+
+/**
+ * 点击搜索按钮
+ */
+const handleSearch = () => {
+  fetchVideos()
+}
+
+/**
+ * 点击分类按钮
+ */
+const handleCategoryChange = (categoryId) => {
+  activeCategoryId.value = categoryId
+  fetchVideos()
 }
 
 /**
@@ -54,7 +101,6 @@ const goToAdmin = () => {
 
 /**
  * 退出登录
- * 清除本地存储并跳转到登录页
  */
 const logout = () => {
   localStorage.removeItem('user_id')
@@ -70,8 +116,9 @@ const goToVideo = (videoId) => {
   router.push(`/video/${videoId}`)
 }
 
-// 页面加载时获取视频列表
+// 页面加载时获取分类和视频列表
 onMounted(() => {
+  fetchCategories()
   fetchVideos()
 })
 </script>
@@ -94,6 +141,41 @@ onMounted(() => {
 
     <!-- 内容区域 -->
     <main class="content">
+      <!-- 搜索和筛选区域 -->
+      <div class="filter-section">
+        <!-- 搜索框 -->
+        <div class="search-box">
+          <input 
+            v-model="searchKeyword" 
+            type="text" 
+            placeholder="搜索视频标题..."
+            @keyup.enter="handleSearch"
+            class="search-input"
+          />
+          <button @click="handleSearch" class="search-btn">搜索</button>
+        </div>
+
+        <!-- 分类标签栏 -->
+        <div class="category-tabs">
+          <button 
+            class="category-tab"
+            :class="{ active: activeCategoryId === 'all' }"
+            @click="handleCategoryChange('all')"
+          >
+            全部
+          </button>
+          <button 
+            v-for="category in categories" 
+            :key="category.id"
+            class="category-tab"
+            :class="{ active: activeCategoryId === category.id }"
+            @click="handleCategoryChange(category.id)"
+          >
+            {{ category.name }}
+          </button>
+        </div>
+      </div>
+
       <!-- 加载状态 -->
       <div v-if="loading" class="loading-state">
         <p>加载中...</p>
@@ -217,6 +299,81 @@ onMounted(() => {
   padding: 24px;
   max-width: 1200px;
   margin: 0 auto;
+}
+
+/* 搜索和筛选区域 */
+.filter-section {
+  margin-bottom: 24px;
+}
+
+/* 搜索框样式 */
+.search-box {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.search-input {
+  flex: 1;
+  padding: 10px 16px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.3s;
+}
+
+.search-input:focus {
+  border-color: #409eff;
+}
+
+.search-btn {
+  padding: 10px 24px;
+  background-color: #409eff;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.search-btn:hover {
+  background-color: #66b1ff;
+}
+
+/* 分类标签栏样式 */
+.category-tabs {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.category-tab {
+  padding: 8px 16px;
+  background-color: #f5f5f5;
+  color: #666;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.category-tab:hover {
+  background-color: #e8e8e8;
+  border-color: #d0d0d0;
+}
+
+.category-tab.active {
+  background-color: #409eff;
+  color: #fff;
+  border-color: #409eff;
+}
+
+.category-tab.active:hover {
+  background-color: #66b1ff;
+  border-color: #66b1ff;
 }
 
 /* 加载和空状态 */
