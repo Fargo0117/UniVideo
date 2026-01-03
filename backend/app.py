@@ -40,9 +40,9 @@ def create_app(config_name='development'):
     from routes.auth import auth_bp
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     
-    # TODO: 注册其他蓝图
-    # from routes.video import video_bp
-    # app.register_blueprint(video_bp, url_prefix='/api/videos')
+    # 注册视频路由蓝图
+    from routes.video import video_bp
+    app.register_blueprint(video_bp, url_prefix='/api/videos')
     
     return app
 
