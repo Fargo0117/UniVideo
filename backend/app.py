@@ -44,6 +44,14 @@ def create_app(config_name='development'):
     from routes.video import video_bp
     app.register_blueprint(video_bp, url_prefix='/api/videos')
     
+    # 注册管理员路由蓝图
+    from routes.admin import admin_bp
+    app.register_blueprint(admin_bp, url_prefix='/api/admin')
+    
+    # 注册互动路由蓝图（评论、点赞）
+    from routes.interaction import interaction_bp
+    app.register_blueprint(interaction_bp, url_prefix='/api')
+    
     return app
 
 # 创建应用实例
