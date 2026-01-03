@@ -111,6 +111,52 @@ def create_comment(video_id):
         }), 500
 
 
+@interaction_bp.route('/videos/<int:video_id>/like/status', methods=['GET'])
+def get_like_status(video_id):
+    """
+    获取用户对视频的点赞状态
+    参数: user_id (查询参数)
+    返回: 当前用户是否已点赞该视频
+    """
+    try:
+        # 获取查询参数
+        user_id = request.args.get('user_id')
+        
+        if not user_id:
+            return jsonify({
+                'code': 400,
+                'msg': '缺少参数：user_id'
+            }), 400
+        
+        # 验证视频是否存在
+        video = Video.query.get(video_id)
+        if not video:
+            return jsonify({
+                'code': 404,
+                'msg': '视频不存在'
+            }), 404
+        
+        # 检查是否已点赞
+        existing_like = Like.query.filter_by(
+            user_id=user_id,
+            video_id=video_id
+        ).first()
+        
+        return jsonify({
+            'code': 200,
+            'msg': '获取成功',
+            'data': {
+                'liked': existing_like is not None
+            }
+        }), 200
+    
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': f'服务器错误: {str(e)}'
+        }), 500
+
+
 @interaction_bp.route('/videos/<int:video_id>/comments', methods=['GET'])
 def get_comments(video_id):
     """

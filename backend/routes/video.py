@@ -126,7 +126,16 @@ def upload_video():
         video_db_path = f"videos/{video_filename}"
         cover_db_path = f"covers/{cover_filename}"
         
-        # 创建视频记录（status 默认为 0 = 待审核）
+        # 根据用户角色决定视频状态
+        # 管理员上传直接发布，普通用户需要审核
+        if user.role == 'admin':
+            video_status = Video.STATUS_PUBLISHED  # 1 = 已发布
+            status_msg = '视频上传成功，已直接发布'
+        else:
+            video_status = Video.STATUS_PENDING  # 0 = 待审核
+            status_msg = '视频上传成功，等待管理员审核'
+        
+        # 创建视频记录
         new_video = Video(
             user_id=int(user_id),
             category_id=int(category_id),
@@ -134,7 +143,7 @@ def upload_video():
             description=description,
             video_path=video_db_path,
             cover_path=cover_db_path,
-            status=Video.STATUS_PENDING  # 0 = 待审核（实现先审后发机制）
+            status=video_status  # 根据角色动态设置状态
         )
         
         # 写入数据库
@@ -143,11 +152,12 @@ def upload_video():
         
         return jsonify({
             'code': 200,
-            'msg': '视频上传成功，等待管理员审核',
+            'msg': status_msg,  # 根据角色返回不同的提示信息
             'data': {
                 'id': new_video.id,
                 'title': new_video.title,
-                'status': new_video.status
+                'status': new_video.status,
+                'is_admin': user.role == 'admin'  # 返回是否为管理员，供前端使用
             }
         }), 201
     
