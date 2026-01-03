@@ -36,10 +36,12 @@ def create_app(config_name='development'):
         os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'covers'), exist_ok=True)
         os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'avatars'), exist_ok=True)
     
-    # TODO: 注册蓝图 (Blueprints)
-    # from routes.auth import auth_bp
+    # 注册蓝图 (Blueprints)
+    from routes.auth import auth_bp
+    app.register_blueprint(auth_bp, url_prefix='/api/auth')
+    
+    # TODO: 注册其他蓝图
     # from routes.video import video_bp
-    # app.register_blueprint(auth_bp, url_prefix='/api/auth')
     # app.register_blueprint(video_bp, url_prefix='/api/videos')
     
     return app
@@ -81,6 +83,6 @@ if __name__ == '__main__':
     # 开发模式运行，启用调试和自动重载
     app.run(
         host='0.0.0.0',  # 允许外部访问
-        port=5001,       # 后端服务端口（使用5001避免AirPlay冲突）
+        port=5001,       # 后端服务端口
         debug=True       # 开启调试模式
     )
