@@ -1,0 +1,44 @@
+# UniVideo Backend Dependencies
+# Python Flask 后端项目依赖包列表
+
+# 核心框架
+Flask==2.3.3
+Werkzeug==2.3.7
+
+# CORS支持（解决跨域问题）
+Flask-CORS==4.0.0
+
+# 数据库ORM
+Flask-SQLAlchemy==3.0.5
+SQLAlchemy==2.0.36
+
+# MySQL数据库驱动
+PyMySQL==1.1.0
+
+# 数据库迁移工具
+Flask-Migrate==4.0.5
+
+# JWT认证
+Flask-JWT-Extended==4.5.2
+
+# 密码加密
+bcrypt==4.0.1
+
+# 环境变量管理
+python-dotenv==1.0.0
+
+# 表单验证
+Flask-WTF==1.1.1
+WTForms==3.0.1
+
+# 日期时间处理
+python-dateutil==2.8.2
+
+# 文件类型检测
+python-magic==0.4.27
+
+# 图片处理（封面图、头像处理）
+Pillow==10.4.0
+
+# 请求库（用于外部API调用）
+requests==2.31.0
