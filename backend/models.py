@@ -1,6 +1,6 @@
 """
 数据库模型定义
-包含 User, Category, Video, Comment, Like 等核心模型
+包含 User, Category, Video, Comment, Like, Collection 等核心模型
 严格对应 univideo_db.sql 表结构
 """
 from flask_sqlalchemy import SQLAlchemy
@@ -34,6 +34,10 @@ class User(db.Model):
     comments = db.relationship('Comment', backref='author', lazy='dynamic', cascade='all, delete-orphan')
     # 关系定义：一个用户可以点赞多个视频
     likes = db.relationship('Like', backref='user', lazy='dynamic', cascade='all, delete-orphan')
+    # 关系定义：一个用户可以收藏多个视频
+    collections = db.relationship('Collection', backref='user', lazy='dynamic', cascade='all, delete-orphan')
+    # 便捷关系：通过 secondary 关联表直接访问收藏的视频
+    favorites = db.relationship('Video', secondary='collections', backref=db.backref('collected_by', lazy='dynamic'), lazy='dynamic')
     
     def set_password(self, password):
         """
@@ -140,6 +144,16 @@ class Video(db.Model):
     comments = db.relationship('Comment', backref='video', lazy='dynamic', cascade='all, delete-orphan')
     # 关系定义：一个视频可以被多个用户点赞
     likes = db.relationship('Like', backref='video', lazy='dynamic', cascade='all, delete-orphan')
+    # 关系定义：一个视频可以被多个用户收藏
+    collections = db.relationship('Collection', backref='video', lazy='dynamic', cascade='all, delete-orphan')
+    
+    def get_collections_count(self):
+        """
+        获取视频收藏数（通过关联表计算）
+        返回:
+            int: 收藏数量
+        """
+        return self.collections.count()
     
     def get_likes_count(self):
         """
@@ -164,6 +178,7 @@ class Video(db.Model):
             'status': self.status,
             'view_count': self.view_count,
             'likes_count': self.get_likes_count(),
+            'collections_count': self.get_collections_count(),
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'category_id': self.category_id,
         }
@@ -289,3 +304,39 @@ class Like(db.Model):
     
     def __repr__(self):
         return f'<Like user_id={self.user_id} video_id={self.video_id}>'
+
+
+class Collection(db.Model):
+    """
+    收藏模型：记录用户对视频的收藏关系
+    对应 SQL: collections 表
+    """
+    __tablename__ = 'collections'
+    
+    # 主键
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True, comment='收藏ID')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='收藏时间')
+    
+    # 外键：关联用户表
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False, comment='用户ID')
+    # 外键：关联视频表
+    video_id = db.Column(db.Integer, db.ForeignKey('videos.id', ondelete='CASCADE'), nullable=False, comment='视频ID')
+    
+    # 联合唯一约束：确保同一用户不能重复收藏同一视频
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'video_id', name='unique_collection'),
+    )
+    
+    def to_dict(self):
+        """
+        将收藏记录转换为字典格式
+        """
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'video_id': self.video_id,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+    
+    def __repr__(self):
+        return f'<Collection user_id={self.user_id} video_id={self.video_id}>'

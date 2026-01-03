@@ -1,7 +1,7 @@
 <script setup>
 /**
  * 视频详情页组件
- * 包含视频播放器、信息展示、点赞功能、评论区
+ * 包含视频播放器、信息展示、点赞功能、收藏功能、评论区
  */
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -21,6 +21,11 @@ const error = ref(null)
 const liked = ref(false)
 const likesCount = ref(0)
 const likeLoading = ref(false)
+
+// 收藏状态
+const collected = ref(false)
+const collectionsCount = ref(0)
+const collectLoading = ref(false)
 
 // 评论数据
 const comments = ref([])
@@ -110,6 +115,7 @@ const fetchVideo = async () => {
     const response = await api.get(`/videos/${route.params.id}`)
     video.value = response.data.data
     likesCount.value = video.value.likes_count || 0
+    collectionsCount.value = video.value.collections_count || 0
   } catch (err) {
     error.value = err.response?.data?.msg || '获取视频详情失败'
     console.error('获取视频详情失败:', err)
@@ -134,6 +140,25 @@ const fetchLikeStatus = async () => {
   } catch (err) {
     console.error('获取点赞状态失败:', err)
     liked.value = false
+  }
+}
+
+/**
+ * 获取当前用户的收藏状态
+ * 进入页面时检查用户是否已收藏该视频
+ */
+const fetchCollectStatus = async () => {
+  // 未登录用户不需要检查收藏状态
+  if (!currentUserId) return
+  
+  try {
+    const response = await api.get(`/videos/${route.params.id}/collect/status`, {
+      params: { user_id: currentUserId }
+    })
+    collected.value = response.data.data?.collected || false
+  } catch (err) {
+    console.error('获取收藏状态失败:', err)
+    collected.value = false
   }
 }
 
@@ -175,6 +200,31 @@ const toggleLike = async () => {
     alert(message)
   } finally {
     likeLoading.value = false
+  }
+}
+
+/**
+ * 收藏/取消收藏
+ */
+const toggleCollect = async () => {
+  if (!currentUserId) {
+    alert('请先登录')
+    router.push('/login')
+    return
+  }
+  
+  collectLoading.value = true
+  try {
+    const response = await api.post(`/videos/${route.params.id}/collect`, {
+      user_id: currentUserId
+    })
+    collected.value = response.data.data.collected
+    collectionsCount.value = response.data.data.collections_count
+  } catch (err) {
+    const message = err.response?.data?.msg || '操作失败'
+    alert(message)
+  } finally {
+    collectLoading.value = false
   }
 }
 
@@ -271,7 +321,8 @@ const goBack = () => {
 
 onMounted(() => {
   fetchVideo()
-  fetchLikeStatus() // 获取当前用户的点赞状态
+  fetchLikeStatus()    // 获取当前用户的点赞状态
+  fetchCollectStatus() // 获取当前用户的收藏状态
   fetchComments()
 })
 </script>
@@ -321,7 +372,7 @@ onMounted(() => {
           <span class="category">{{ video.category?.name || '未分类' }}</span>
         </div>
 
-        <!-- 作者信息和点赞 -->
+        <!-- 作者信息和互动按钮 -->
         <div class="author-like-row">
           <div class="author-info">
             <img 
@@ -333,15 +384,30 @@ onMounted(() => {
             <span class="author-name">{{ video.author?.nickname || '未知作者' }}</span>
           </div>
           
-          <button 
-            class="like-btn"
-            :class="{ 'liked': liked }"
-            :disabled="likeLoading"
-            @click="toggleLike"
-          >
-            <span class="like-icon">{{ liked ? '❤️' : '🤍' }}</span>
-            <span class="like-count">{{ likesCount }}</span>
-          </button>
+          <!-- 互动按钮组 -->
+          <div class="action-btns">
+            <!-- 点赞按钮 -->
+            <button 
+              class="like-btn"
+              :class="{ 'liked': liked }"
+              :disabled="likeLoading"
+              @click="toggleLike"
+            >
+              <span class="like-icon">{{ liked ? '❤️' : '🤍' }}</span>
+              <span class="like-count">{{ likesCount }}</span>
+            </button>
+            
+            <!-- 收藏按钮 -->
+            <button 
+              class="collect-btn"
+              :class="{ 'collected': collected }"
+              :disabled="collectLoading"
+              @click="toggleCollect"
+            >
+              <span class="collect-icon">{{ collected ? '⭐' : '☆' }}</span>
+              <span class="collect-count">{{ collectionsCount }}</span>
+            </button>
+          </div>
         </div>
 
         <!-- 视频简介 -->
@@ -612,7 +678,7 @@ onMounted(() => {
   color: #409eff;
 }
 
-/* 作者和点赞行 */
+/* 作者和互动按钮行 */
 .author-like-row {
   display: flex;
   justify-content: space-between;
@@ -640,6 +706,12 @@ onMounted(() => {
   font-size: 15px;
   font-weight: 500;
   color: #333;
+}
+
+/* 互动按钮组 */
+.action-btns {
+  display: flex;
+  gap: 12px;
 }
 
 /* 点赞按钮 */
@@ -675,6 +747,43 @@ onMounted(() => {
 }
 
 .like-count {
+  font-size: 14px;
+  color: #666;
+}
+
+/* 收藏按钮 */
+.collect-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.collect-btn:hover {
+  background: #fffbe6;
+  border-color: #ffe58f;
+}
+
+.collect-btn.collected {
+  background: #fffbe6;
+  border-color: #faad14;
+}
+
+.collect-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.collect-icon {
+  font-size: 18px;
+}
+
+.collect-count {
   font-size: 14px;
   color: #666;
 }

@@ -63,3 +63,14 @@ CREATE TABLE IF NOT EXISTS `likes` (
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
   FOREIGN KEY (`video_id`) REFERENCES `videos`(`id`) ON DELETE CASCADE
 ) COMMENT='点赞记录表';
+
+/* 6. 收藏表 */
+CREATE TABLE IF NOT EXISTS `collections` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT NOT NULL COMMENT '用户ID',
+  `video_id` INT NOT NULL COMMENT '视频ID',
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `unique_collection` (`user_id`, `video_id`), /* 防止重复收藏 */
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`video_id`) REFERENCES `videos`(`id`) ON DELETE CASCADE
+) COMMENT='用户收藏表';

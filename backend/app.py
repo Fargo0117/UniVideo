@@ -48,9 +48,13 @@ def create_app(config_name='development'):
     from routes.admin import admin_bp
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     
-    # 注册互动路由蓝图（评论、点赞）
+    # 注册互动路由蓝图（评论、点赞、收藏）
     from routes.interaction import interaction_bp
     app.register_blueprint(interaction_bp, url_prefix='/api')
+    
+    # 注册用户个人中心路由蓝图
+    from routes.user import user_bp
+    app.register_blueprint(user_bp, url_prefix='/api/users')
     
     return app
 

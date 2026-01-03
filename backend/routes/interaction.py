@@ -3,7 +3,7 @@
 提供评论、点赞等用户互动功能API接口
 """
 from flask import Blueprint, request, jsonify
-from models import db, Comment, Like, Video, User
+from models import db, Comment, Like, Collection, Video, User
 
 # 创建互动蓝图
 interaction_bp = Blueprint('interaction', __name__)
@@ -105,6 +105,133 @@ def create_comment(video_id):
     except Exception as e:
         # 发生异常时回滚事务
         db.session.rollback()
+        return jsonify({
+            'code': 500,
+            'msg': f'服务器错误: {str(e)}'
+        }), 500
+
+
+@interaction_bp.route('/videos/<int:video_id>/collect', methods=['POST'])
+def toggle_collect(video_id):
+    """
+    收藏/取消收藏接口
+    接收JSON: {user_id}
+    逻辑：如果已收藏则取消，未收藏则添加
+    返回: 当前收藏状态和视频最新收藏总数
+    """
+    try:
+        # 获取请求数据
+        data = request.get_json()
+        
+        # 验证必填字段
+        if not data or not data.get('user_id'):
+            return jsonify({
+                'code': 400,
+                'msg': '缺少必填字段：user_id'
+            }), 400
+        
+        user_id = data.get('user_id')
+        
+        # 验证视频是否存在
+        video = Video.query.get(video_id)
+        if not video:
+            return jsonify({
+                'code': 404,
+                'msg': '视频不存在'
+            }), 404
+        
+        # 验证用户是否存在
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({
+                'code': 404,
+                'msg': '用户不存在'
+            }), 404
+        
+        # 检查是否已存在收藏记录
+        existing_collection = Collection.query.filter_by(
+            user_id=user_id,
+            video_id=video_id
+        ).first()
+        
+        if existing_collection:
+            # 已存在收藏记录，取消收藏
+            db.session.delete(existing_collection)
+            db.session.commit()
+            collected = False
+            msg = '取消收藏成功'
+        else:
+            # 不存在收藏记录，添加收藏
+            new_collection = Collection(
+                user_id=user_id,
+                video_id=video_id
+            )
+            db.session.add(new_collection)
+            db.session.commit()
+            collected = True
+            msg = '收藏成功'
+        
+        # 获取视频最新收藏总数
+        collections_count = video.get_collections_count()
+        
+        return jsonify({
+            'code': 200,
+            'msg': msg,
+            'data': {
+                'collected': collected,
+                'collections_count': collections_count
+            }
+        }), 200
+    
+    except Exception as e:
+        # 发生异常时回滚事务
+        db.session.rollback()
+        return jsonify({
+            'code': 500,
+            'msg': f'服务器错误: {str(e)}'
+        }), 500
+
+
+@interaction_bp.route('/videos/<int:video_id>/collect/status', methods=['GET'])
+def get_collect_status(video_id):
+    """
+    获取用户对视频的收藏状态
+    参数: user_id (查询参数)
+    返回: 当前用户是否已收藏该视频
+    """
+    try:
+        # 获取查询参数
+        user_id = request.args.get('user_id')
+        
+        if not user_id:
+            return jsonify({
+                'code': 400,
+                'msg': '缺少参数：user_id'
+            }), 400
+        
+        # 验证视频是否存在
+        video = Video.query.get(video_id)
+        if not video:
+            return jsonify({
+                'code': 404,
+                'msg': '视频不存在'
+            }), 404
+        
+        # 检查是否已收藏
+        existing_collection = Collection.query.filter_by(
+            user_id=user_id,
+            video_id=video_id
+        ).first()
+        
+        return jsonify({
+            'code': 200,
+            'msg': '获取成功',
+            'data': {
+                'collected': existing_collection is not None
+            }
+        }), 200
+    
+    except Exception as e:
         return jsonify({
             'code': 500,
             'msg': f'服务器错误: {str(e)}'

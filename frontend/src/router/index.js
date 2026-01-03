@@ -42,6 +42,12 @@ const router = createRouter({
       path: '/admin',
       name: 'admin',
       component: () => import('../views/AdminAudit.vue')
+    },
+    {
+      // 个人主页
+      path: '/profile',
+      name: 'profile',
+      component: () => import('../views/Profile.vue')
     }
   ]
 })

@@ -1,7 +1,7 @@
 <script setup>
 /**
  * 首页组件
- * 展示视频列表，提供导航、搜索和分类筛选功能
+ * 展示视频列表，提供导航、搜索、分类筛选和个人中心入口
  */
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
@@ -100,6 +100,13 @@ const goToAdmin = () => {
 }
 
 /**
+ * 跳转到个人主页
+ */
+const goToProfile = () => {
+  router.push('/profile')
+}
+
+/**
  * 退出登录
  */
 const logout = () => {
@@ -131,9 +138,14 @@ onMounted(() => {
         <h1 class="logo">UniVideo</h1>
       </div>
       <div class="navbar-right">
-        <span class="welcome-text">欢迎，{{ nickname }}</span>
+        <!-- 用户昵称，点击跳转个人主页 -->
+        <span class="welcome-text" @click="goToProfile" style="cursor: pointer;">
+          欢迎，<span class="nickname-link">{{ nickname }}</span>
+        </span>
         <!-- 管理后台入口，仅管理员可见 -->
         <button v-if="isAdmin" class="btn btn-admin" @click="goToAdmin">管理后台</button>
+        <!-- 个人主页按钮 -->
+        <button class="btn btn-profile" @click="goToProfile">个人主页</button>
         <button class="btn btn-primary" @click="goToUpload">上传视频</button>
         <button class="btn btn-secondary" @click="logout">退出登录</button>
       </div>
@@ -253,6 +265,25 @@ onMounted(() => {
 .welcome-text {
   color: #666;
   font-size: 14px;
+}
+
+.nickname-link {
+  color: #409eff;
+  font-weight: 500;
+}
+
+.nickname-link:hover {
+  text-decoration: underline;
+}
+
+/* 个人主页按钮样式 */
+.btn-profile {
+  background-color: #67c23a;
+  color: #fff;
+}
+
+.btn-profile:hover {
+  background-color: #85ce61;
 }
 
 /* 按钮样式 */
