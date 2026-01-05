@@ -416,11 +416,6 @@ onMounted(() => {
 
 <template>
   <div class="profile-container">
-    <!-- 顶部导航 -->
-    <header class="nav-bar">
-      <span class="site-name">UniVideo - 个人主页</span>
-    </header>
-
     <!-- 加载状态 -->
     <div v-if="userLoading" class="loading-state">
       <p>加载中...</p>
@@ -704,25 +699,6 @@ onMounted(() => {
 .profile-container {
   min-height: 100vh;
   background-color: #f5f5f5;
-}
-
-/* 导航栏 */
-.nav-bar {
-  display: flex;
-  align-items: center;
-  padding: 0 24px;
-  height: 56px;
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-.site-name {
-  font-size: 18px;
-  font-weight: bold;
-  color: #409eff;
 }
 
 /* 加载/空状态 */

@@ -104,3 +104,22 @@ CREATE TABLE IF NOT EXISTS `follows` (
   INDEX `idx_follower` (`follower_id`), /* 优化查询某用户的关注列表 */
   INDEX `idx_followed` (`followed_id`)  /* 优化查询某用户的粉丝列表 */
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户关注关系表';
+
+/* 9. 通知表 */
+CREATE TABLE IF NOT EXISTS `notifications` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY COMMENT '通知ID',
+  `title` VARCHAR(100) NOT NULL COMMENT '消息标题',
+  `content` TEXT NOT NULL COMMENT '消息正文',
+  `msg_type` VARCHAR(20) NOT NULL DEFAULT 'system' COMMENT '消息类型: system/audit/interaction',
+  `related_link` VARCHAR(200) DEFAULT NULL COMMENT '关联链接（点击消息跳转的链接）',
+  `is_read` BOOLEAN DEFAULT FALSE NOT NULL COMMENT '是否已读',
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL COMMENT '创建时间',
+  `extra_data` TEXT COMMENT '额外数据（JSON格式）',
+  `user_id` INT DEFAULT NULL COMMENT '接收用户ID（NULL表示系统通知）',
+  `video_id` INT DEFAULT NULL COMMENT '关联视频ID',
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`video_id`) REFERENCES `videos`(`id`) ON DELETE SET NULL,
+  INDEX `idx_user_created` (`user_id`, `created_at`), /* 优化查询某用户的通知 */
+  INDEX `idx_is_read` (`is_read`), /* 优化查询未读通知 */
+  INDEX `idx_msg_type` (`msg_type`) /* 优化按消息类型查询 */
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='通知表';

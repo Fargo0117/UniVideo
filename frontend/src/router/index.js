@@ -62,6 +62,13 @@ const router = createRouter({
       name: 'author',
       component: () => import('../views/AuthorPage.vue'),
       meta: { hideNavbar: false }
+    },
+    {
+      // 消息中心
+      path: '/messages',
+      name: 'messages',
+      component: () => import('../views/MessageCenter.vue'),
+      meta: { hideNavbar: false, requiresAuth: true }
     }
   ]
 })

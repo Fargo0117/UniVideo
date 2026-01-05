@@ -3,11 +3,47 @@
 提供视频审核、管理等功能API接口
 """
 from flask import Blueprint, request, jsonify, current_app
-from models import db, Video
+from models import db, Video, User, Notification
+from datetime import datetime, timedelta
 import os
+import json
 
 # 创建管理员蓝图
 admin_bp = Blueprint('admin', __name__)
+
+
+@admin_bp.route('/stats', methods=['GET'])
+def get_stats():
+    """
+    获取管理员统计数据接口
+    返回: 待审核视频数、总用户数、今日新增视频数
+    """
+    try:
+        # 待审核视频数
+        pending_videos_count = Video.query.filter_by(status=Video.STATUS_PENDING).count()
+        
+        # 总用户数
+        total_users_count = User.query.count()
+        
+        # 今日新增视频数（今天0点到现在）
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_new_count = Video.query.filter(Video.created_at >= today_start).count()
+        
+        return jsonify({
+            'code': 200,
+            'msg': '获取成功',
+            'data': {
+                'pending_videos': pending_videos_count,
+                'total_users': total_users_count,
+                'today_new': today_new_count
+            }
+        }), 200
+    
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': f'服务器错误: {str(e)}'
+        }), 500
 
 
 @admin_bp.route('/manage/list', methods=['GET'])
@@ -146,9 +182,35 @@ def audit_video(video_id):
         if action == 'approve':
             video.status = Video.STATUS_PUBLISHED  # 通过审核
             result_msg = '审核通过，视频已发布'
+            # 创建通知：视频审核通过
+            notification = Notification(
+                title='视频审核结果',
+                content=f'您的视频《{video.title}》已通过审核并发布',
+                msg_type=Notification.MSG_TYPE_AUDIT,
+                related_link=f'/video/{video.id}',
+                user_id=video.user_id,
+                video_id=video.id
+            )
+            db.session.add(notification)
         else:  # action == 'reject'
             video.status = Video.STATUS_REJECTED   # 驳回
             result_msg = '视频已驳回'
+            # 获取驳回理由
+            reason = data.get('reason', '')
+            reject_content = f'您的视频《{video.title}》未通过审核'
+            if reason:
+                reject_content += f'，驳回理由：{reason}'
+            # 创建通知：视频审核驳回
+            notification = Notification(
+                title='视频审核结果',
+                content=reject_content,
+                msg_type=Notification.MSG_TYPE_AUDIT,
+                related_link='/upload',  # 驳回后引导用户重新上传
+                user_id=video.user_id,
+                video_id=video.id,
+                extra_data=json.dumps({'reason': reason}) if reason else None
+            )
+            db.session.add(notification)
         
         # 保存更改到数据库
         db.session.commit()
@@ -238,6 +300,271 @@ def delete_video(video_id):
     except Exception as e:
         # 发生异常时回滚事务
         db.session.rollback()
+        return jsonify({
+            'code': 500,
+            'msg': f'服务器错误: {str(e)}'
+        }), 500
+
+
+@admin_bp.route('/notifications/send', methods=['POST'])
+def send_notification():
+    """
+    发送通知接口（仅管理员可用）
+    参数:
+        - user_id (可选): 接收用户ID，如果为空则视为群发/广播（暂只实现指定ID发送）
+        - title: 消息标题
+        - content: 消息正文
+        - msg_type (可选): 消息类型，默认为 'system'，可选值: 'system', 'audit', 'interaction'
+        - related_link (可选): 关联链接
+    返回: 发送结果
+    """
+    try:
+        # 获取请求数据
+        data = request.get_json()
+        
+        # 验证必填字段
+        if not data:
+            return jsonify({
+                'code': 400,
+                'msg': '缺少请求数据'
+            }), 400
+        
+        title = data.get('title', '').strip()
+        content = data.get('content', '').strip()
+        user_id = data.get('user_id')
+        msg_type = data.get('msg_type', Notification.MSG_TYPE_SYSTEM)
+        related_link = data.get('related_link')
+        
+        # 验证必填字段
+        if not title:
+            return jsonify({
+                'code': 400,
+                'msg': '缺少必填字段：title'
+            }), 400
+        
+        if not content:
+            return jsonify({
+                'code': 400,
+                'msg': '缺少必填字段：content'
+            }), 400
+        
+        # 验证消息类型
+        valid_types = [Notification.MSG_TYPE_SYSTEM, Notification.MSG_TYPE_AUDIT, Notification.MSG_TYPE_INTERACTION]
+        if msg_type not in valid_types:
+            return jsonify({
+                'code': 400,
+                'msg': f'msg_type 参数无效，仅支持: {", ".join(valid_types)}'
+            }), 400
+        
+        # 验证用户ID（如果提供）
+        if user_id:
+            user = User.query.get(user_id)
+            if not user:
+                return jsonify({
+                    'code': 404,
+                    'msg': '用户不存在'
+                }), 404
+        
+        # 创建通知
+        notification = Notification(
+            title=title,
+            content=content,
+            msg_type=msg_type,
+            related_link=related_link,
+            user_id=user_id  # 如果为None，表示系统通知（群发）
+        )
+        
+        db.session.add(notification)
+        db.session.commit()
+        
+        return jsonify({
+            'code': 200,
+            'msg': '通知发送成功',
+            'data': {
+                'notification_id': notification.id,
+                'title': notification.title,
+                'msg_type': notification.msg_type,
+                'user_id': notification.user_id
+            }
+        }), 200
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'code': 500,
+            'msg': f'服务器错误: {str(e)}'
+        }), 500
+
+
+@admin_bp.route('/notifications', methods=['GET'])
+def get_notifications():
+    """
+    获取通知列表接口
+    参数:
+        - user_id (可选): 用户ID，不传则返回系统通知
+        - is_read (可选): 是否已读筛选 (true/false)
+        - limit (可选): 返回数量限制，默认20
+        - offset (可选): 偏移量，默认0
+    返回: 通知列表
+    """
+    try:
+        # 获取查询参数
+        user_id = request.args.get('user_id', type=int)
+        is_read = request.args.get('is_read')
+        limit = request.args.get('limit', 20, type=int)
+        offset = request.args.get('offset', 0, type=int)
+        
+        # 构建查询
+        query = Notification.query
+        
+        # 用户ID筛选
+        if user_id:
+            query = query.filter(Notification.user_id == user_id)
+        else:
+            # 如果没有指定用户ID，返回系统通知（user_id为NULL）
+            query = query.filter(Notification.user_id.is_(None))
+        
+        # 已读状态筛选
+        if is_read is not None:
+            is_read_bool = is_read.lower() == 'true'
+            query = query.filter(Notification.is_read == is_read_bool)
+        
+        # 按创建时间倒序排列
+        query = query.order_by(Notification.created_at.desc())
+        
+        # 总数
+        total = query.count()
+        
+        # 分页
+        notifications = query.offset(offset).limit(limit).all()
+        
+        # 转换为字典列表
+        notification_list = [notif.to_dict(include_video=True) for notif in notifications]
+        
+        return jsonify({
+            'code': 200,
+            'msg': '获取成功',
+            'data': {
+                'total': total,
+                'list': notification_list
+            }
+        }), 200
+    
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': f'服务器错误: {str(e)}'
+        }), 500
+
+
+@admin_bp.route('/notifications/<int:notification_id>/read', methods=['PUT'])
+def mark_notification_read(notification_id):
+    """
+    标记通知为已读接口
+    返回: 操作结果
+    """
+    try:
+        # 查找通知
+        notification = Notification.query.get(notification_id)
+        
+        if not notification:
+            return jsonify({
+                'code': 404,
+                'msg': '通知不存在'
+            }), 404
+        
+        # 标记为已读
+        notification.is_read = True
+        db.session.commit()
+        
+        return jsonify({
+            'code': 200,
+            'msg': '标记成功',
+            'data': {
+                'notification_id': notification_id,
+                'is_read': True
+            }
+        }), 200
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'code': 500,
+            'msg': f'服务器错误: {str(e)}'
+        }), 500
+
+
+@admin_bp.route('/notifications/read-all', methods=['PUT'])
+def mark_all_notifications_read():
+    """
+    标记所有通知为已读接口
+    参数:
+        - user_id (可选): 用户ID，不传则标记系统通知
+    返回: 操作结果
+    """
+    try:
+        # 获取查询参数
+        user_id = request.args.get('user_id', type=int)
+        
+        # 构建查询
+        query = Notification.query.filter_by(is_read=False)
+        
+        if user_id:
+            query = query.filter(Notification.user_id == user_id)
+        else:
+            query = query.filter(Notification.user_id.is_(None))
+        
+        # 批量更新
+        updated_count = query.update({'is_read': True})
+        db.session.commit()
+        
+        return jsonify({
+            'code': 200,
+            'msg': '标记成功',
+            'data': {
+                'updated_count': updated_count
+            }
+        }), 200
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'code': 500,
+            'msg': f'服务器错误: {str(e)}'
+        }), 500
+
+
+@admin_bp.route('/notifications/unread-count', methods=['GET'])
+def get_unread_count():
+    """
+    获取未读通知数量接口
+    参数:
+        - user_id (可选): 用户ID，不传则返回系统通知未读数
+    返回: 未读通知数量
+    """
+    try:
+        # 获取查询参数
+        user_id = request.args.get('user_id', type=int)
+        
+        # 构建查询
+        query = Notification.query.filter_by(is_read=False)
+        
+        if user_id:
+            query = query.filter(Notification.user_id == user_id)
+        else:
+            query = query.filter(Notification.user_id.is_(None))
+        
+        count = query.count()
+        
+        return jsonify({
+            'code': 200,
+            'msg': '获取成功',
+            'data': {
+                'unread_count': count
+            }
+        }), 200
+    
+    except Exception as e:
         return jsonify({
             'code': 500,
             'msg': f'服务器错误: {str(e)}'

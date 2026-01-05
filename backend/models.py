@@ -503,3 +503,84 @@ class Follow(db.Model):
     
     def __repr__(self):
         return f'<Follow follower_id={self.follower_id} followed_id={self.followed_id}>'
+
+
+class Notification(db.Model):
+    """
+    通知模型：存储系统通知和用户通知
+    对应 SQL: notifications 表
+    """
+    __tablename__ = 'notifications'
+    
+    # 消息类型常量
+    MSG_TYPE_SYSTEM = 'system'  # 系统公告
+    MSG_TYPE_AUDIT = 'audit'  # 审核通知
+    MSG_TYPE_INTERACTION = 'interaction'  # 互动通知（点赞、评论等）
+    
+    # 主键
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True, comment='通知ID')
+    # 消息标题
+    title = db.Column(db.String(100), nullable=False, comment='消息标题')
+    # 消息正文
+    content = db.Column(db.Text, nullable=False, comment='消息正文')
+    # 消息类型：system/audit/interaction
+    msg_type = db.Column(db.String(20), nullable=False, default=MSG_TYPE_SYSTEM, comment='消息类型')
+    # 关联链接（可选，点击消息跳转的链接）
+    related_link = db.Column(db.String(200), nullable=True, comment='关联链接')
+    # 是否已读
+    is_read = db.Column(db.Boolean, default=False, nullable=False, comment='是否已读')
+    # 创建时间
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, comment='创建时间')
+    # 关联数据（JSON格式，存储额外信息）
+    extra_data = db.Column(db.Text, comment='额外数据（JSON格式）')
+    
+    # 外键：关联用户表（如果为NULL，表示系统通知，所有用户可见）
+    user_id = db.Column(
+        db.Integer, 
+        db.ForeignKey('users.id', ondelete='CASCADE'), 
+        nullable=True, 
+        comment='接收用户ID（NULL表示系统通知）'
+    )
+    # 外键：关联视频表（可选，用于视频相关通知）
+    video_id = db.Column(
+        db.Integer, 
+        db.ForeignKey('videos.id', ondelete='SET NULL'), 
+        nullable=True, 
+        comment='关联视频ID'
+    )
+    
+    # 索引：优化查询
+    __table_args__ = (
+        db.Index('idx_user_created', 'user_id', 'created_at'),
+        db.Index('idx_is_read', 'is_read'),
+    )
+    
+    # 关系定义
+    user = db.relationship('User', backref='notifications')
+    video = db.relationship('Video', backref='notifications')
+    
+    def to_dict(self, include_video=False):
+        """
+        将通知对象转换为字典格式
+        """
+        data = {
+            'id': self.id,
+            'title': self.title,
+            'content': self.content,
+            'msg_type': self.msg_type,
+            'related_link': self.related_link,
+            'is_read': self.is_read,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'user_id': self.user_id,
+            'video_id': self.video_id,
+        }
+        if include_video and self.video:
+            data['video'] = {
+                'id': self.video.id,
+                'title': self.video.title,
+                'cover_path': self.video.cover_path,
+            }
+        return data
+    
+    def __repr__(self):
+        return f'<Notification id={self.id} msg_type={self.msg_type} user_id={self.user_id}>'

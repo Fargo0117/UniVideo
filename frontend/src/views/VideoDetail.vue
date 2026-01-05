@@ -552,11 +552,6 @@ watch(() => route.params.id, (newId, oldId) => {
 
 <template>
   <div class="video-detail-container">
-    <!-- 顶部导航 -->
-    <header class="nav-bar">
-      <span class="site-name">UniVideo</span>
-    </header>
-
     <!-- 加载状态 -->
     <div v-if="loading" class="loading-state">
       <p>加载中...</p>
@@ -839,31 +834,6 @@ watch(() => route.params.id, (newId, oldId) => {
 .video-detail-container {
   min-height: 100vh;
   background: #F4F5F7;
-}
-
-/* ==================== 导航栏 - 磨砂玻璃 ==================== */
-.nav-bar {
-  display: flex;
-  align-items: center;
-  padding: 0 32px;
-  height: 64px;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05);
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-}
-
-.site-name {
-  font-size: 22px;
-  font-weight: 700;
-  background: linear-gradient(135deg, #FF5252 0%, #FF7070 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  letter-spacing: -0.5px;
 }
 
 /* ==================== 加载/错误状态 ==================== */
