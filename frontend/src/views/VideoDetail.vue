@@ -317,6 +317,15 @@ const goBack = () => {
   router.push('/')
 }
 
+/**
+ * 跳转到作者主页
+ */
+const goToAuthor = () => {
+  if (video.value?.author?.id) {
+    router.push(`/author/${video.value.author.id}`)
+  }
+}
+
 // ==================== 生命周期 ====================
 
 onMounted(() => {
@@ -374,7 +383,7 @@ onMounted(() => {
 
         <!-- 作者信息和互动按钮 -->
         <div class="author-like-row">
-          <div class="author-info">
+          <div class="author-info" @click="goToAuthor">
             <img 
               class="author-avatar" 
               :src="getFullUrl(video.author?.avatar) || '/default-avatar.png'" 
@@ -692,6 +701,12 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+  cursor: pointer;
+  transition: opacity 0.3s;
+}
+
+.author-info:hover {
+  opacity: 0.7;
 }
 
 .author-avatar {

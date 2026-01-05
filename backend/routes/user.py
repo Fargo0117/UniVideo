@@ -139,8 +139,8 @@ def update_current_user():
                 # 保存文件
                 avatar_file.save(avatar_path)
                 
-                # 更新数据库中的头像路径（存储相对路径）
-                user.avatar = f"/static/avatars/{new_filename}"
+                # 更新数据库中的头像路径（存储相对路径，不包含/static/前缀）
+                user.avatar = f"avatars/{new_filename}"
         
         # 提交更改
         db.session.commit()
@@ -260,6 +260,56 @@ def get_my_collections():
             'data': {
                 'total': len(video_list),
                 'list': video_list
+            }
+        }), 200
+    
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': f'服务器错误: {str(e)}'
+        }), 500
+
+
+@user_bp.route('/<int:user_id>', methods=['GET'])
+def get_user_info(user_id):
+    """
+    获取指定用户的信息和视频列表（作者主页）
+    参数: user_id (路径参数)
+    返回: 用户信息和已发布的视频列表
+    """
+    try:
+        # 查询用户
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({
+                'code': 404,
+                'msg': '用户不存在'
+            }), 404
+        
+        # 查询用户发布的已发布状态的视频，按时间倒序
+        videos = Video.query.filter_by(
+            user_id=user_id, 
+            status=Video.STATUS_PUBLISHED
+        ).order_by(Video.created_at.desc()).all()
+        
+        # 转换为字典列表，并添加完整的URL
+        video_list = []
+        for video in videos:
+            video_data = video.to_dict(include_author=False)
+            # 添加完整的封面和视频URL
+            video_data['cover_url'] = f"http://localhost:5001/static/{video.cover_path}"
+            video_data['video_url'] = f"http://localhost:5001/static/{video.video_path}"
+            video_list.append(video_data)
+        
+        return jsonify({
+            'code': 200,
+            'msg': '获取成功',
+            'data': {
+                'user': user.to_dict(),
+                'videos': {
+                    'total': len(video_list),
+                    'list': video_list
+                }
             }
         }), 200
     

@@ -48,6 +48,12 @@ const router = createRouter({
       path: '/profile',
       name: 'profile',
       component: () => import('../views/Profile.vue')
+    },
+    {
+      // 作者主页
+      path: '/author/:id',
+      name: 'author',
+      component: () => import('../views/AuthorPage.vue')
     }
   ]
 })
