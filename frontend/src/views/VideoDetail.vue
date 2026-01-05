@@ -636,180 +636,241 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* ==================== 全局布局 ==================== */
+/* ==================== 全局布局 - 深色主题 ==================== */
 .video-detail-container {
   min-height: 100vh;
-  background-color: #f5f5f5;
+  background: linear-gradient(180deg, #0f0f0f 0%, #1a1a1a 50%, #F9F9F9 50%, #F9F9F9 100%);
 }
 
-/* 导航栏 */
+/* ==================== 导航栏 - 磨砂玻璃 ==================== */
 .nav-bar {
   display: flex;
   align-items: center;
-  padding: 0 24px;
-  height: 56px;
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 0 32px;
+  height: 64px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05);
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 1000;
 }
 
 .back-btn {
   background: none;
   border: none;
-  color: #409eff;
-  font-size: 14px;
+  color: var(--primary-color, #FF5252);
+  font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
-  padding: 8px 0;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
 }
 
 .back-btn:hover {
-  text-decoration: underline;
+  background: rgba(255, 82, 82, 0.1);
+  transform: translateX(-4px);
 }
 
 .site-name {
   margin-left: 16px;
-  font-size: 18px;
-  font-weight: bold;
-  color: #409eff;
+  font-size: 22px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #FF5252 0%, #FF7070 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.5px;
 }
 
-/* 加载/错误状态 */
+/* ==================== 加载/错误状态 ==================== */
 .loading-state,
 .error-state {
   text-align: center;
-  padding: 80px 20px;
-  color: #999;
+  padding: 100px 20px;
+  color: var(--text-tertiary, #999);
+  font-size: 16px;
 }
 
+.loading-state::before {
+  content: '';
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(255, 82, 82, 0.1);
+  border-top-color: var(--primary-color, #FF5252);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ==================== 按钮样式 ==================== */
 .btn {
-  padding: 8px 16px;
+  padding: 10px 20px;
   border: none;
-  border-radius: 4px;
+  border-radius: 8px;
   font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.3s;
+  transition: all 0.3s ease;
+}
+
+.btn:active {
+  transform: scale(0.97);
 }
 
 .btn-primary {
-  background-color: #409eff;
+  background: linear-gradient(135deg, #FF5252 0%, #FF7070 100%);
   color: #fff;
+  box-shadow: 0 2px 8px rgba(255, 82, 82, 0.3);
 }
 
 .btn-primary:hover {
-  background-color: #66b1ff;
+  background: linear-gradient(135deg, #FF7070 0%, #FF9090 100%);
+  box-shadow: 0 4px 12px rgba(255, 82, 82, 0.4);
+  transform: translateY(-2px);
 }
 
 .btn-primary:disabled {
-  background-color: #a0cfff;
+  background: #ccc;
   cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
 .btn-secondary {
-  background-color: #f5f5f5;
-  color: #666;
+  background: #fff;
+  color: var(--text-secondary, #666);
+  border: 1px solid var(--border-color, #E0E0E0);
 }
 
 .btn-secondary:hover {
-  background-color: #e8e8e8;
+  background: #F9F9F9;
+  border-color: var(--text-tertiary, #999);
 }
 
 /* ==================== 主内容区 ==================== */
 .video-content {
-  max-width: 900px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 0;
 }
 
-/* 视频播放器 */
+/* ==================== 视频播放器 - 影院模式 ==================== */
 .video-player-section {
-  background: #000;
-  border-radius: 8px;
-  overflow: hidden;
-  margin-bottom: 20px;
+  background: #0f0f0f;
+  padding: 40px 0;
+  margin-bottom: 0;
 }
 
 .artplayer-container {
-  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
   aspect-ratio: 16 / 9;
-  max-height: 600px;
   background-color: #000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 
 /* ==================== 视频信息区 ==================== */
 .video-info-section {
   background: #fff;
-  border-radius: 8px;
-  padding: 20px 24px;
-  margin-bottom: 20px;
+  border-radius: 16px;
+  padding: 28px 32px;
+  margin: 32px auto 24px;
+  max-width: 1200px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
 .video-title {
-  font-size: 22px;
-  font-weight: 600;
-  color: #333;
-  margin: 0 0 12px 0;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text-primary, #333);
+  margin: 0 0 16px 0;
   line-height: 1.4;
+  letter-spacing: -0.3px;
 }
 
 .video-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: #999;
-  margin-bottom: 16px;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--text-tertiary, #999);
+  margin-bottom: 24px;
 }
 
 .separator {
-  color: #ddd;
+  color: var(--border-color, #E0E0E0);
+}
+
+.views {
+  font-weight: 500;
 }
 
 .category {
-  color: #409eff;
+  color: var(--primary-color, #FF5252);
+  font-weight: 600;
+  background: rgba(255, 82, 82, 0.1);
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 13px;
 }
 
-/* 作者和互动按钮行 */
+/* ==================== 作者和互动按钮行 ==================== */
 .author-like-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 0;
-  border-top: 1px solid #f0f0f0;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 20px 0;
+  border-top: 2px solid var(--border-light, #F0F0F0);
+  border-bottom: 2px solid var(--border-light, #F0F0F0);
 }
 
 .author-info {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   cursor: pointer;
-  transition: opacity 0.3s;
+  padding: 8px 12px;
+  border-radius: 12px;
+  transition: all 0.3s ease;
 }
 
 .author-info:hover {
-  opacity: 0.7;
+  background: rgba(255, 82, 82, 0.05);
+  transform: translateX(4px);
 }
 
 .author-avatar {
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   object-fit: cover;
-  background-color: #f0f0f0;
+  background: linear-gradient(135deg, #f0f0f0 0%, #e8e8e8 100%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.author-info:hover .author-avatar {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: scale(1.05);
 }
 
 .author-name {
-  font-size: 15px;
-  font-weight: 500;
-  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #333);
 }
 
-/* 互动按钮组 */
+/* ==================== 互动按钮组 ==================== */
 .action-btns {
   display: flex;
   gap: 12px;
@@ -819,128 +880,176 @@ onUnmounted(() => {
 .like-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  background: #f5f5f5;
-  border: 1px solid #e0e0e0;
-  border-radius: 20px;
+  gap: 8px;
+  padding: 10px 20px;
+  background: #fff;
+  border: 2px solid var(--border-color, #E0E0E0);
+  border-radius: 24px;
   cursor: pointer;
-  transition: all 0.3s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
 }
 
 .like-btn:hover {
-  background: #fff0f0;
-  border-color: #ffccc7;
+  background: rgba(255, 82, 82, 0.05);
+  border-color: var(--primary-color, #FF5252);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 82, 82, 0.2);
 }
 
 .like-btn.liked {
-  background: #fff0f0;
-  border-color: #ff4d4f;
+  background: linear-gradient(135deg, #FF5252 0%, #FF7070 100%);
+  border-color: transparent;
+  box-shadow: 0 4px 12px rgba(255, 82, 82, 0.3);
+}
+
+.like-btn.liked .like-count {
+  color: #fff;
 }
 
 .like-btn:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
 }
 
 .like-icon {
-  font-size: 18px;
+  font-size: 20px;
+  transition: transform 0.3s ease;
+}
+
+.like-btn:hover .like-icon {
+  transform: scale(1.2);
 }
 
 .like-count {
-  font-size: 14px;
-  color: #666;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-secondary, #666);
 }
 
 /* 收藏按钮 */
 .collect-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  background: #f5f5f5;
-  border: 1px solid #e0e0e0;
-  border-radius: 20px;
+  gap: 8px;
+  padding: 10px 20px;
+  background: #fff;
+  border: 2px solid var(--border-color, #E0E0E0);
+  border-radius: 24px;
   cursor: pointer;
-  transition: all 0.3s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
 }
 
 .collect-btn:hover {
-  background: #fffbe6;
-  border-color: #ffe58f;
+  background: rgba(255, 193, 7, 0.05);
+  border-color: #FFC107;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 193, 7, 0.2);
 }
 
 .collect-btn.collected {
-  background: #fffbe6;
-  border-color: #faad14;
+  background: linear-gradient(135deg, #FFC107 0%, #FFD54F 100%);
+  border-color: transparent;
+  box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
+}
+
+.collect-btn.collected .collect-count {
+  color: #fff;
 }
 
 .collect-btn:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
 }
 
 .collect-icon {
-  font-size: 18px;
+  font-size: 20px;
+  transition: transform 0.3s ease;
+}
+
+.collect-btn:hover .collect-icon {
+  transform: scale(1.2) rotate(15deg);
 }
 
 .collect-count {
-  font-size: 14px;
-  color: #666;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-secondary, #666);
 }
 
-/* 视频简介 */
+/* ==================== 视频简介 ==================== */
 .video-description {
-  margin-top: 16px;
+  margin-top: 20px;
+  padding: 20px;
+  background: var(--bg-color, #F9F9F9);
+  border-radius: 12px;
 }
 
 .video-description h3 {
-  font-size: 14px;
-  color: #999;
-  margin: 0 0 8px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-secondary, #666);
+  margin: 0 0 12px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .video-description p {
-  font-size: 14px;
-  color: #666;
-  line-height: 1.6;
+  font-size: 15px;
+  color: var(--text-primary, #333);
+  line-height: 1.8;
   margin: 0;
   white-space: pre-wrap;
 }
 
-/* ==================== 评论区 ==================== */
+/* ==================== 评论区 - 气泡式设计 ==================== */
 .comment-section {
   background: #fff;
-  border-radius: 8px;
-  padding: 20px 24px;
+  border-radius: 16px;
+  padding: 32px;
+  margin: 0 auto 40px;
+  max-width: 1200px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
 .section-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
-  margin: 0 0 20px 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary, #333);
+  margin: 0 0 28px 0;
+  letter-spacing: -0.3px;
 }
 
-/* 评论输入框 */
+/* ==================== 评论输入框 ==================== */
 .comment-input-box {
-  margin-bottom: 24px;
+  margin-bottom: 32px;
 }
 
 .comment-input-box textarea {
   width: 100%;
-  padding: 12px;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  font-size: 14px;
+  padding: 16px 20px;
+  border: 2px solid var(--border-color, #E0E0E0);
+  border-radius: 12px;
+  font-size: 15px;
+  line-height: 1.6;
   resize: vertical;
   box-sizing: border-box;
   margin-bottom: 12px;
+  transition: all 0.3s ease;
+  font-family: inherit;
+}
+
+.comment-input-box textarea:hover {
+  border-color: var(--text-tertiary, #999);
 }
 
 .comment-input-box textarea:focus {
   outline: none;
-  border-color: #409eff;
+  border-color: var(--primary-color, #FF5252);
+  box-shadow: 0 0 0 4px rgba(255, 82, 82, 0.1);
 }
 
 .comment-input-box .btn {
@@ -953,43 +1062,50 @@ onUnmounted(() => {
   clear: both;
 }
 
-/* 评论列表 */
+/* ==================== 评论列表 ==================== */
 .comments-loading,
 .no-comments {
   text-align: center;
-  padding: 40px 0;
-  color: #999;
+  padding: 60px 0;
+  color: var(--text-tertiary, #999);
+  font-size: 15px;
 }
 
 .comment-list {
-  border-top: 1px solid #f0f0f0;
-  padding-top: 16px;
+  padding-top: 24px;
 }
 
-/* 单条评论 */
+/* ==================== 单条评论 - 卡片式 ==================== */
 .comment-item {
-  margin-bottom: 20px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #f5f5f5;
+  margin-bottom: 24px;
+  padding: 20px;
+  background: var(--bg-color, #F9F9F9);
+  border-radius: 16px;
+  transition: all 0.3s ease;
+}
+
+.comment-item:hover {
+  background: #f5f5f5;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .comment-item:last-child {
-  border-bottom: none;
   margin-bottom: 0;
 }
 
 .comment-main {
   display: flex;
-  gap: 12px;
+  gap: 16px;
 }
 
 .comment-avatar {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-  background-color: #f0f0f0;
+  background: linear-gradient(135deg, #f0f0f0 0%, #e8e8e8 100%);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
 .comment-body {
@@ -1001,92 +1117,107 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .comment-author {
-  font-size: 14px;
-  font-weight: 500;
-  color: #333;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary, #333);
 }
 
 .comment-time {
-  font-size: 12px;
-  color: #999;
+  font-size: 13px;
+  color: var(--text-tertiary, #999);
 }
 
 .comment-content {
-  font-size: 14px;
-  color: #333;
-  line-height: 1.6;
-  margin: 0 0 8px 0;
+  font-size: 15px;
+  color: var(--text-primary, #333);
+  line-height: 1.7;
+  margin: 0 0 12px 0;
   word-break: break-word;
 }
 
 .reply-btn {
   background: none;
   border: none;
-  color: #999;
-  font-size: 12px;
+  color: var(--primary-color, #FF5252);
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-  padding: 0;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
 }
 
 .reply-btn:hover {
-  color: #409eff;
+  background: rgba(255, 82, 82, 0.1);
 }
 
-/* 回复输入框 */
+/* ==================== 回复输入框 ==================== */
 .reply-input-box {
-  margin: 12px 0 12px 48px;
-  padding: 12px;
-  background: #f9f9f9;
-  border-radius: 8px;
+  margin: 16px 0 0 56px;
+  padding: 16px;
+  background: #fff;
+  border-radius: 12px;
+  border: 2px solid var(--border-light, #F0F0F0);
 }
 
 .reply-input-box.nested {
-  margin-left: 40px;
+  margin-left: 44px;
 }
 
 .reply-input-box textarea {
   width: 100%;
-  padding: 10px;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  font-size: 13px;
+  padding: 12px 16px;
+  border: 2px solid var(--border-color, #E0E0E0);
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.6;
   resize: none;
   box-sizing: border-box;
+  transition: all 0.3s ease;
+  font-family: inherit;
 }
 
 .reply-input-box textarea:focus {
   outline: none;
-  border-color: #409eff;
+  border-color: var(--primary-color, #FF5252);
+  box-shadow: 0 0 0 3px rgba(255, 82, 82, 0.1);
 }
 
 .reply-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 10px;
+  margin-top: 12px;
 }
 
 .reply-actions .btn {
-  padding: 6px 12px;
+  padding: 8px 16px;
   font-size: 13px;
 }
 
-/* 回复列表 */
+/* ==================== 回复列表 ==================== */
 .replies-list {
-  margin-left: 48px;
-  margin-top: 12px;
-  padding-left: 12px;
-  border-left: 2px solid #f0f0f0;
+  margin-left: 56px;
+  margin-top: 16px;
+  padding-left: 20px;
+  border-left: 3px solid rgba(255, 82, 82, 0.15);
 }
 
 .reply-item {
   display: flex;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.reply-item:hover {
+  background: rgba(255, 82, 82, 0.03);
 }
 
 .reply-item:last-child {
@@ -1094,12 +1225,13 @@ onUnmounted(() => {
 }
 
 .reply-avatar {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-  background-color: #f0f0f0;
+  background: linear-gradient(135deg, #f0f0f0 0%, #e8e8e8 100%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
 }
 
 .reply-body {
@@ -1111,25 +1243,63 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .reply-author {
-  font-size: 13px;
-  font-weight: 500;
-  color: #333;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #333);
 }
 
 .reply-time {
-  font-size: 11px;
-  color: #999;
+  font-size: 12px;
+  color: var(--text-tertiary, #999);
 }
 
 .reply-content {
-  font-size: 13px;
-  color: #333;
-  line-height: 1.5;
-  margin: 0 0 6px 0;
+  font-size: 14px;
+  color: var(--text-primary, #333);
+  line-height: 1.6;
+  margin: 0 0 8px 0;
   word-break: break-word;
+}
+
+/* ==================== 响应式设计 ==================== */
+@media (max-width: 768px) {
+  .video-info-section,
+  .comment-section {
+    margin-left: 16px;
+    margin-right: 16px;
+    padding: 20px;
+  }
+
+  .video-title {
+    font-size: 20px;
+  }
+
+  .author-like-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .action-btns {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .replies-list {
+    margin-left: 20px;
+    padding-left: 12px;
+  }
+
+  .reply-input-box {
+    margin-left: 20px;
+  }
+
+  .reply-input-box.nested {
+    margin-left: 12px;
+  }
 }
 </style>
