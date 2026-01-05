@@ -3,7 +3,7 @@
  * 视频详情页组件
  * 包含 ArtPlayer 视频播放器（含弹幕）、信息展示、点赞功能、收藏功能、评论区
  */
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/api'
 import Artplayer from 'artplayer'
@@ -18,6 +18,10 @@ const router = useRouter()
 const video = ref(null)
 const loading = ref(true)
 const error = ref(null)
+
+// 推荐视频列表
+const relatedVideos = ref([])
+const relatedLoading = ref(false)
 
 // 点赞状态
 const liked = ref(false)
@@ -121,11 +125,41 @@ const fetchVideo = async () => {
     video.value = response.data.data
     likesCount.value = video.value.likes_count || 0
     collectionsCount.value = video.value.collections_count || 0
+    
+    // 获取视频详情后，立即获取推荐视频
+    if (video.value.category_id) {
+      fetchRelatedVideos(video.value.category_id)
+    }
   } catch (err) {
     error.value = err.response?.data?.msg || '获取视频详情失败'
     console.error('获取视频详情失败:', err)
   } finally {
     loading.value = false
+  }
+}
+
+/**
+ * 获取同分类推荐视频
+ * @param {number} categoryId - 分类ID
+ */
+const fetchRelatedVideos = async (categoryId) => {
+  relatedLoading.value = true
+  try {
+    const response = await api.get('/videos/list', { 
+      params: { 
+        category_id: categoryId
+      } 
+    })
+    // 过滤掉当前视频，取前10个
+    const videoList = response.data.data || []
+    relatedVideos.value = videoList
+      .filter(v => v.id !== parseInt(route.params.id))
+      .slice(0, 10)
+  } catch (err) {
+    console.error('获取推荐视频失败:', err)
+    relatedVideos.value = []
+  } finally {
+    relatedLoading.value = false
   }
 }
 
@@ -332,6 +366,14 @@ const goToAuthor = () => {
 }
 
 /**
+ * 跳转到推荐视频
+ * @param {number} videoId - 视频ID
+ */
+const goToVideo = (videoId) => {
+  router.push(`/video/${videoId}`)
+}
+
+/**
  * 初始化 ArtPlayer 播放器
  */
 const initPlayer = () => {
@@ -408,7 +450,20 @@ const destroyPlayer = () => {
 
 // ==================== 生命周期 ====================
 
-onMounted(async () => {
+/**
+ * 初始化页面数据
+ */
+const initPageData = async () => {
+  // 销毁旧的播放器实例
+  destroyPlayer()
+  
+  // 重置状态
+  liked.value = false
+  collected.value = false
+  comments.value = []
+  relatedVideos.value = []
+  
+  // 加载新数据
   await fetchVideo()
   fetchLikeStatus()    // 获取当前用户的点赞状态
   fetchCollectStatus() // 获取当前用户的收藏状态
@@ -418,10 +473,21 @@ onMounted(async () => {
   if (video.value) {
     initPlayer()
   }
+}
+
+onMounted(() => {
+  initPageData()
 })
 
 onUnmounted(() => {
   destroyPlayer()
+})
+
+// 监听路由变化，支持点击推荐视频刷新页面
+watch(() => route.params.id, (newId, oldId) => {
+  if (newId && newId !== oldId) {
+    initPageData()
+  }
 })
 </script>
 
@@ -446,70 +512,71 @@ onUnmounted(() => {
 
     <!-- 视频内容 -->
     <main v-else-if="video" class="video-content">
-      <!-- ArtPlayer 视频播放器（含弹幕） -->
-      <section class="video-player-section">
-        <div id="artplayer-app" class="artplayer-container"></div>
-      </section>
-
-      <!-- 视频信息区 -->
-      <section class="video-info-section">
-        <h1 class="video-title">{{ video.title }}</h1>
-        
-        <div class="video-meta">
-          <span class="views">{{ video.view_count || 0 }} 播放</span>
-          <span class="separator">·</span>
-          <span class="time">{{ formatTime(video.created_at) }}</span>
-          <span class="separator">·</span>
-          <span class="category">{{ video.category?.name || '未分类' }}</span>
-        </div>
-
-        <!-- 作者信息和互动按钮 -->
-        <div class="author-like-row">
-          <div class="author-info" @click="goToAuthor">
-            <img 
-              class="author-avatar" 
-              :src="getFullUrl(video.author?.avatar) || '/default-avatar.png'" 
-              :alt="video.author?.nickname"
-              @error="(e) => e.target.src = 'https://via.placeholder.com/40'"
-            />
-            <span class="author-name">{{ video.author?.nickname || '未知作者' }}</span>
+      <!-- 左侧主内容 -->
+      <div class="left-column">
+        <!-- 视频信息头 -->
+        <section class="video-header">
+          <h1 class="video-title">{{ video.title }}</h1>
+          <div class="video-data">
+            <span class="data-item">
+              <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+              </svg>
+              {{ video.view_count || 0 }}
+            </span>
+            <span class="data-item">
+              <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
+              </svg>
+              {{ comments.length }}
+            </span>
+            <span class="data-item date">{{ formatTime(video.created_at) }}</span>
           </div>
+        </section>
+
+        <!-- ArtPlayer 视频播放器 -->
+        <section class="player-wrapper">
+          <div id="artplayer-app" class="artplayer-container"></div>
+        </section>
+
+        <!-- 工具栏：点赞、收藏、分享 -->
+        <section class="video-toolbar">
+          <button 
+            class="toolbar-btn like-btn"
+            :class="{ 'active': liked }"
+            :disabled="likeLoading"
+            @click="toggleLike"
+          >
+            <span class="icon">{{ liked ? '❤️' : '🤍' }}</span>
+            <span class="text">{{ liked ? '已点赞' : '点赞' }}</span>
+            <span class="count">{{ likesCount }}</span>
+          </button>
           
-          <!-- 互动按钮组 -->
-          <div class="action-btns">
-            <!-- 点赞按钮 -->
-            <button 
-              class="like-btn"
-              :class="{ 'liked': liked }"
-              :disabled="likeLoading"
-              @click="toggleLike"
-            >
-              <span class="like-icon">{{ liked ? '❤️' : '🤍' }}</span>
-              <span class="like-count">{{ likesCount }}</span>
-            </button>
-            
-            <!-- 收藏按钮 -->
-            <button 
-              class="collect-btn"
-              :class="{ 'collected': collected }"
-              :disabled="collectLoading"
-              @click="toggleCollect"
-            >
-              <span class="collect-icon">{{ collected ? '⭐' : '☆' }}</span>
-              <span class="collect-count">{{ collectionsCount }}</span>
-            </button>
-          </div>
-        </div>
+          <button 
+            class="toolbar-btn collect-btn"
+            :class="{ 'active': collected }"
+            :disabled="collectLoading"
+            @click="toggleCollect"
+          >
+            <span class="icon">{{ collected ? '⭐' : '☆' }}</span>
+            <span class="text">{{ collected ? '已收藏' : '收藏' }}</span>
+            <span class="count">{{ collectionsCount }}</span>
+          </button>
+
+          <button class="toolbar-btn share-btn">
+            <span class="icon">🔗</span>
+            <span class="text">分享</span>
+          </button>
+        </section>
 
         <!-- 视频简介 -->
-        <div class="video-description" v-if="video.description">
-          <h3>简介</h3>
-          <p>{{ video.description }}</p>
-        </div>
-      </section>
+        <section class="video-desc" v-if="video.description">
+          <h3 class="desc-title">视频简介</h3>
+          <p class="desc-content">{{ video.description }}</p>
+        </section>
 
-      <!-- 评论区 -->
-      <section class="comment-section">
+        <!-- 评论区 -->
+        <section class="comment-section">
         <h2 class="section-title">评论区 ({{ comments.length }})</h2>
         
         <!-- 主评论输入框 -->
@@ -631,15 +698,86 @@ onUnmounted(() => {
           </div>
         </div>
       </section>
+      </div>
+
+      <!-- 右侧推荐区 -->
+      <aside class="right-column">
+        <!-- UP主卡片 -->
+        <div class="uploader-card">
+          <div class="uploader-main">
+            <div class="uploader-left" @click="goToAuthor">
+              <img 
+                class="uploader-avatar" 
+                :src="getFullUrl(video.author?.avatar) || '/default-avatar.png'" 
+                :alt="video.author?.nickname"
+                @error="(e) => e.target.src = 'https://via.placeholder.com/50'"
+              />
+              <div class="uploader-info">
+                <div class="uploader-name">{{ video.author?.nickname || '未知作者' }}</div>
+                <div class="uploader-bio">{{ video.author?.bio || '这个UP主很懒，什么都没有留下' }}</div>
+              </div>
+            </div>
+            <button 
+              class="follow-btn" 
+              v-if="currentUserId && currentUserId != video.author?.id"
+            >
+              <span class="follow-icon">+</span>
+              <span class="follow-text">关注</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 推荐视频列表 -->
+        <div class="rec-list">
+          <h3 class="rec-title">相关推荐</h3>
+          
+          <div v-if="relatedLoading" class="rec-loading">
+            <p>加载中...</p>
+          </div>
+          
+          <div v-else-if="relatedVideos.length === 0" class="rec-empty">
+            <p>暂无推荐</p>
+          </div>
+          
+          <div v-else class="rec-items">
+            <div 
+              v-for="item in relatedVideos" 
+              :key="item.id"
+              class="rec-item"
+              @click="goToVideo(item.id)"
+            >
+              <div class="rec-cover">
+                <img 
+                  :src="getFullUrl(item.cover_path)" 
+                  :alt="item.title"
+                  @error="(e) => e.target.src = 'https://via.placeholder.com/140x79'"
+                />
+                <div class="rec-duration" v-if="item.duration">
+                  {{ item.duration }}
+                </div>
+              </div>
+              <div class="rec-info">
+                <h4 class="rec-item-title">{{ item.title }}</h4>
+                <div class="rec-author">{{ item.author?.nickname || '未知' }}</div>
+                <div class="rec-stats">
+                  <span>{{ item.view_count || 0 }} 播放</span>
+                  <span>·</span>
+                  <span>{{ item.danmaku_count || 0 }} 弹幕</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
     </main>
   </div>
 </template>
 
 <style scoped>
-/* ==================== 全局布局 - 深色主题 ==================== */
+/* ==================== 全局布局 - Bilibili 风格 ==================== */
 .video-detail-container {
   min-height: 100vh;
-  background: linear-gradient(180deg, #0f0f0f 0%, #1a1a1a 50%, #F9F9F9 50%, #F9F9F9 100%);
+  background: #F4F5F7;
 }
 
 /* ==================== 导航栏 - 磨砂玻璃 ==================== */
@@ -710,35 +848,35 @@ onUnmounted(() => {
   to { transform: rotate(360deg); }
 }
 
-/* ==================== 按钮样式 ==================== */
+/* ==================== 按钮样式 - Bilibili 风格 ==================== */
 .btn {
-  padding: 10px 20px;
+  padding: 8px 16px;
   border: none;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: 4px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
 }
 
 .btn:active {
-  transform: scale(0.97);
+  transform: scale(0.98);
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #FF5252 0%, #FF7070 100%);
+  background: #00AEEC;
   color: #fff;
-  box-shadow: 0 2px 8px rgba(255, 82, 82, 0.3);
+  box-shadow: none;
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, #FF7070 0%, #FF9090 100%);
-  box-shadow: 0 4px 12px rgba(255, 82, 82, 0.4);
-  transform: translateY(-2px);
+  background: #00A0DD;
+  box-shadow: 0 2px 6px rgba(0, 174, 236, 0.3);
 }
 
 .btn-primary:disabled {
-  background: #ccc;
+  background: #E3E5E7;
+  color: #C9CCD0;
   cursor: not-allowed;
   box-shadow: none;
   transform: none;
@@ -746,310 +884,271 @@ onUnmounted(() => {
 
 .btn-secondary {
   background: #fff;
-  color: var(--text-secondary, #666);
-  border: 1px solid var(--border-color, #E0E0E0);
+  color: #18191C;
+  border: 1px solid #E3E5E7;
 }
 
 .btn-secondary:hover {
-  background: #F9F9F9;
-  border-color: var(--text-tertiary, #999);
+  background: #F6F7F8;
+  border-color: #C9CCD0;
 }
 
-/* ==================== 主内容区 ==================== */
+/* ==================== 主内容区 - Grid布局 ==================== */
 .video-content {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 0;
+  padding: 32px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 350px;
+  gap: 30px;
+  align-items: start;
 }
 
-/* ==================== 视频播放器 - 影院模式 ==================== */
-.video-player-section {
-  background: #0f0f0f;
-  padding: 40px 32px;
-  margin-bottom: 0;
+/* ==================== 左侧主内容列 ==================== */
+.left-column {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.artplayer-container {
-  max-width: 1000px;
-  margin: 0 auto;
-  aspect-ratio: 16 / 9;
-  background-color: #000;
-  border-radius: 16px;
-  overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-}
-
-/* ==================== 视频信息区 ==================== */
-.video-info-section {
+/* ==================== 视频信息头 - Bilibili 风格 ==================== */
+.video-header {
   background: #fff;
-  border-radius: 16px;
-  padding: 28px 32px;
-  margin: 32px auto 24px;
-  max-width: 1200px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border-radius: 4px;
+  padding: 16px 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
 .video-title {
-  font-size: 26px;
-  font-weight: 700;
-  color: var(--text-primary, #333);
-  margin: 0 0 16px 0;
-  line-height: 1.4;
-  letter-spacing: -0.3px;
+  font-size: 20px;
+  font-weight: 500;
+  color: #18191C;
+  margin: 0 0 12px 0;
+  line-height: 1.5;
+  letter-spacing: 0;
 }
 
-.video-meta {
+.video-data {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 0;
+  font-size: 12px;
+  color: #9499A0;
+  margin: 0;
+}
+
+.data-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 20px;
+}
+
+.data-item:last-child {
+  margin-right: 0;
+}
+
+.data-item .icon {
+  width: 16px;
+  height: 16px;
+  opacity: 0.7;
+}
+
+.data-item.date {
+  margin-left: auto;
+}
+
+/* ==================== 播放器容器 - Bilibili 风格 ==================== */
+.player-wrapper {
+  background: #000;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.artplayer-container {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background-color: #000;
+}
+
+/* ==================== 视频工具栏 - Bilibili 风格 ==================== */
+.video-toolbar {
+  background: #fff;
+  border-radius: 4px;
+  padding: 0 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #E3E5E7;
+}
+
+.toolbar-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 16px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #18191C;
   font-size: 14px;
-  color: var(--text-tertiary, #999);
-  margin-bottom: 24px;
+  position: relative;
 }
 
-.separator {
-  color: var(--border-color, #E0E0E0);
+.toolbar-btn::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 2px;
+  background: #00AEEC;
+  transition: width 0.2s ease;
 }
 
-.views {
+.toolbar-btn:hover {
+  color: #00AEEC;
+}
+
+.toolbar-btn:hover::after {
+  width: 60%;
+}
+
+.toolbar-btn.active {
+  color: #00AEEC;
   font-weight: 500;
 }
 
-.category {
-  color: var(--primary-color, #FF5252);
-  font-weight: 600;
-  background: rgba(255, 82, 82, 0.1);
-  padding: 3px 10px;
-  border-radius: 6px;
+.toolbar-btn.active::after {
+  width: 60%;
+}
+
+.toolbar-btn .icon {
+  font-size: 18px;
+}
+
+.toolbar-btn .text {
+  font-size: 14px;
+  font-weight: inherit;
+}
+
+.toolbar-btn .count {
   font-size: 13px;
+  color: #9499A0;
+  margin-left: 2px;
 }
 
-/* ==================== 作者和互动按钮行 ==================== */
-.author-like-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 0;
-  border-top: 2px solid var(--border-light, #F0F0F0);
-  border-bottom: 2px solid var(--border-light, #F0F0F0);
+.toolbar-btn.like-btn:hover,
+.toolbar-btn.like-btn.active {
+  color: #FB7299;
 }
 
-.author-info {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  cursor: pointer;
-  padding: 8px 12px;
-  border-radius: 12px;
-  transition: all 0.3s ease;
+.toolbar-btn.like-btn:hover::after,
+.toolbar-btn.like-btn.active::after {
+  background: #FB7299;
 }
 
-.author-info:hover {
-  background: rgba(255, 82, 82, 0.05);
-  transform: translateX(4px);
+.toolbar-btn.collect-btn:hover,
+.toolbar-btn.collect-btn.active {
+  color: #FFA500;
 }
 
-.author-avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  object-fit: cover;
-  background: linear-gradient(135deg, #f0f0f0 0%, #e8e8e8 100%);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
+.toolbar-btn.collect-btn:hover::after,
+.toolbar-btn.collect-btn.active::after {
+  background: #FFA500;
 }
 
-.author-info:hover .author-avatar {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transform: scale(1.05);
-}
-
-.author-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary, #333);
-}
-
-/* ==================== 互动按钮组 ==================== */
-.action-btns {
-  display: flex;
-  gap: 12px;
-}
-
-/* 点赞按钮 */
-.like-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
-  background: #fff;
-  border: 2px solid var(--border-color, #E0E0E0);
-  border-radius: 24px;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s ease;
-}
-
-.like-btn:hover {
-  background: rgba(255, 82, 82, 0.05);
-  border-color: var(--primary-color, #FF5252);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(255, 82, 82, 0.2);
-}
-
-.like-btn.liked {
-  background: linear-gradient(135deg, #FF5252 0%, #FF7070 100%);
-  border-color: transparent;
-  box-shadow: 0 4px 12px rgba(255, 82, 82, 0.3);
-}
-
-.like-btn.liked .like-count {
-  color: #fff;
-}
-
-.like-btn:disabled {
+.toolbar-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  transform: none;
 }
 
-.like-icon {
-  font-size: 20px;
-  transition: transform 0.3s ease;
+.toolbar-btn:disabled:hover {
+  color: #18191C;
 }
 
-.like-btn:hover .like-icon {
-  transform: scale(1.2);
+.toolbar-btn:disabled::after {
+  width: 0 !important;
 }
 
-.like-count {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-secondary, #666);
-}
-
-/* 收藏按钮 */
-.collect-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
+/* ==================== 视频简介 - Bilibili 风格 ==================== */
+.video-desc {
   background: #fff;
-  border: 2px solid var(--border-color, #E0E0E0);
-  border-radius: 24px;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s ease;
+  border-radius: 4px;
+  padding: 16px 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
-.collect-btn:hover {
-  background: rgba(255, 193, 7, 0.05);
-  border-color: #FFC107;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(255, 193, 7, 0.2);
-}
-
-.collect-btn.collected {
-  background: linear-gradient(135deg, #FFC107 0%, #FFD54F 100%);
-  border-color: transparent;
-  box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
-}
-
-.collect-btn.collected .collect-count {
-  color: #fff;
-}
-
-.collect-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.collect-icon {
-  font-size: 20px;
-  transition: transform 0.3s ease;
-}
-
-.collect-btn:hover .collect-icon {
-  transform: scale(1.2) rotate(15deg);
-}
-
-.collect-count {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-secondary, #666);
-}
-
-/* ==================== 视频简介 ==================== */
-.video-description {
-  margin-top: 20px;
-  padding: 20px;
-  background: var(--bg-color, #F9F9F9);
-  border-radius: 12px;
-}
-
-.video-description h3 {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-secondary, #666);
+.desc-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #18191C;
   margin: 0 0 12px 0;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #E3E5E7;
 }
 
-.video-description p {
-  font-size: 15px;
-  color: var(--text-primary, #333);
+.desc-content {
+  font-size: 13px;
+  color: #18191C;
   line-height: 1.8;
   margin: 0;
   white-space: pre-wrap;
 }
 
-/* ==================== 评论区 - 气泡式设计 ==================== */
+/* ==================== 评论区 - Bilibili 风格 ==================== */
 .comment-section {
   background: #fff;
-  border-radius: 16px;
-  padding: 32px;
-  margin: 0 auto 40px;
-  max-width: 1200px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border-radius: 4px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
 .section-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text-primary, #333);
-  margin: 0 0 28px 0;
-  letter-spacing: -0.3px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #18191C;
+  margin: 0 0 16px 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #E3E5E7;
 }
 
-/* ==================== 评论输入框 ==================== */
+/* ==================== 评论输入框 - Bilibili 风格 ==================== */
 .comment-input-box {
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
 .comment-input-box textarea {
   width: 100%;
-  padding: 16px 20px;
-  border: 2px solid var(--border-color, #E0E0E0);
-  border-radius: 12px;
-  font-size: 15px;
+  padding: 12px 16px;
+  border: 1px solid #E3E5E7;
+  border-radius: 4px;
+  font-size: 13px;
   line-height: 1.6;
   resize: vertical;
   box-sizing: border-box;
-  margin-bottom: 12px;
-  transition: all 0.3s ease;
+  margin-bottom: 10px;
+  transition: all 0.2s ease;
   font-family: inherit;
+  background: #F6F7F8;
 }
 
 .comment-input-box textarea:hover {
-  border-color: var(--text-tertiary, #999);
+  border-color: #C9CCD0;
+  background: #fff;
 }
 
 .comment-input-box textarea:focus {
   outline: none;
-  border-color: var(--primary-color, #FF5252);
-  box-shadow: 0 0 0 4px rgba(255, 82, 82, 0.1);
+  border-color: #00AEEC;
+  box-shadow: 0 0 0 2px rgba(0, 174, 236, 0.1);
+  background: #fff;
 }
 
 .comment-input-box .btn {
@@ -1075,22 +1174,18 @@ onUnmounted(() => {
   padding-top: 24px;
 }
 
-/* ==================== 单条评论 - 卡片式 ==================== */
+/* ==================== 单条评论 - Bilibili 风格 ==================== */
 .comment-item {
-  margin-bottom: 24px;
-  padding: 20px;
-  background: var(--bg-color, #F9F9F9);
-  border-radius: 16px;
-  transition: all 0.3s ease;
-}
-
-.comment-item:hover {
-  background: #f5f5f5;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  margin-bottom: 20px;
+  padding: 16px 0;
+  background: transparent;
+  border-bottom: 1px solid #E3E5E7;
+  transition: all 0.2s ease;
 }
 
 .comment-item:last-child {
   margin-bottom: 0;
+  border-bottom: none;
 }
 
 .comment-main {
@@ -1099,13 +1194,12 @@ onUnmounted(() => {
 }
 
 .comment-avatar {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
   background: linear-gradient(135deg, #f0f0f0 0%, #e8e8e8 100%);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
 .comment-body {
@@ -1116,108 +1210,106 @@ onUnmounted(() => {
 .comment-header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   margin-bottom: 8px;
 }
 
 .comment-author {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary, #333);
+  font-size: 13px;
+  font-weight: 500;
+  color: #18191C;
 }
 
 .comment-time {
-  font-size: 13px;
-  color: var(--text-tertiary, #999);
+  font-size: 12px;
+  color: #9499A0;
 }
 
 .comment-content {
-  font-size: 15px;
-  color: var(--text-primary, #333);
-  line-height: 1.7;
-  margin: 0 0 12px 0;
+  font-size: 13px;
+  color: #18191C;
+  line-height: 1.8;
+  margin: 0 0 10px 0;
   word-break: break-word;
 }
 
 .reply-btn {
   background: none;
   border: none;
-  color: var(--primary-color, #FF5252);
-  font-size: 13px;
+  color: #9499A0;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  padding: 6px 12px;
-  border-radius: 6px;
+  padding: 4px 10px;
+  border-radius: 4px;
   transition: all 0.2s ease;
 }
 
 .reply-btn:hover {
-  background: rgba(255, 82, 82, 0.1);
+  color: #00AEEC;
+  background: rgba(0, 174, 236, 0.08);
 }
 
-/* ==================== 回复输入框 ==================== */
+/* ==================== 回复输入框 - Bilibili 风格 ==================== */
 .reply-input-box {
-  margin: 16px 0 0 56px;
-  padding: 16px;
-  background: #fff;
-  border-radius: 12px;
-  border: 2px solid var(--border-light, #F0F0F0);
+  margin: 12px 0 0 48px;
+  padding: 12px;
+  background: #F6F7F8;
+  border-radius: 4px;
+  border: 1px solid #E3E5E7;
 }
 
 .reply-input-box.nested {
-  margin-left: 44px;
+  margin-left: 40px;
 }
 
 .reply-input-box textarea {
   width: 100%;
-  padding: 12px 16px;
-  border: 2px solid var(--border-color, #E0E0E0);
-  border-radius: 8px;
-  font-size: 14px;
+  padding: 10px 12px;
+  border: 1px solid #E3E5E7;
+  border-radius: 4px;
+  font-size: 13px;
   line-height: 1.6;
   resize: none;
   box-sizing: border-box;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   font-family: inherit;
+  background: #fff;
 }
 
 .reply-input-box textarea:focus {
   outline: none;
-  border-color: var(--primary-color, #FF5252);
-  box-shadow: 0 0 0 3px rgba(255, 82, 82, 0.1);
+  border-color: #00AEEC;
+  box-shadow: 0 0 0 2px rgba(0, 174, 236, 0.1);
 }
 
 .reply-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .reply-actions .btn {
-  padding: 8px 16px;
-  font-size: 13px;
+  padding: 6px 14px;
+  font-size: 12px;
 }
 
-/* ==================== 回复列表 ==================== */
+/* ==================== 回复列表 - Bilibili 风格 ==================== */
 .replies-list {
-  margin-left: 56px;
-  margin-top: 16px;
-  padding-left: 20px;
-  border-left: 3px solid rgba(255, 82, 82, 0.15);
+  margin-left: 48px;
+  margin-top: 12px;
+  padding-left: 16px;
+  border-left: 2px solid #E3E5E7;
 }
 
 .reply-item {
   display: flex;
-  gap: 12px;
-  margin-bottom: 16px;
-  padding: 12px;
-  border-radius: 12px;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px 0;
+  border-radius: 0;
   transition: all 0.2s ease;
-}
-
-.reply-item:hover {
-  background: rgba(255, 82, 82, 0.03);
 }
 
 .reply-item:last-child {
@@ -1225,13 +1317,12 @@ onUnmounted(() => {
 }
 
 .reply-avatar {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
   background: linear-gradient(135deg, #f0f0f0 0%, #e8e8e8 100%);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
 }
 
 .reply-body {
@@ -1242,51 +1333,311 @@ onUnmounted(() => {
 .reply-header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 6px;
 }
 
 .reply-author {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary, #333);
+  font-size: 12px;
+  font-weight: 500;
+  color: #18191C;
 }
 
 .reply-time {
-  font-size: 12px;
-  color: var(--text-tertiary, #999);
+  font-size: 11px;
+  color: #9499A0;
 }
 
 .reply-content {
-  font-size: 14px;
-  color: var(--text-primary, #333);
-  line-height: 1.6;
-  margin: 0 0 8px 0;
+  font-size: 12px;
+  color: #18191C;
+  line-height: 1.7;
+  margin: 0 0 6px 0;
   word-break: break-word;
 }
 
+/* ==================== 右侧推荐列 ==================== */
+.right-column {
+  position: sticky;
+  top: 80px;
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 优化滚动条样式 */
+.right-column::-webkit-scrollbar {
+  width: 6px;
+}
+
+.right-column::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.right-column::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+}
+
+.right-column::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* ==================== UP主卡片 - Bilibili 风格 ==================== */
+.uploader-card {
+  background: #fff;
+  border-radius: 4px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.uploader-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.uploader-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  flex: 1;
+  min-width: 0;
+  transition: opacity 0.2s ease;
+}
+
+.uploader-left:hover {
+  opacity: 0.8;
+}
+
+.uploader-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: linear-gradient(135deg, #f0f0f0 0%, #e8e8e8 100%);
+  flex-shrink: 0;
+}
+
+.uploader-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.uploader-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #18191C;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uploader-bio {
+  font-size: 12px;
+  color: #9499A0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.follow-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  background: #00AEEC;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.follow-btn:hover {
+  background: #00A0DD;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 174, 236, 0.3);
+}
+
+.follow-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.follow-text {
+  line-height: 1;
+}
+
+/* ==================== 推荐视频列表 - Bilibili 风格 ==================== */
+.rec-list {
+  background: #fff;
+  border-radius: 4px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.rec-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #18191C;
+  margin: 0 0 12px 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #E3E5E7;
+}
+
+.rec-loading,
+.rec-empty {
+  text-align: center;
+  padding: 40px 0;
+  color: var(--text-tertiary, #999);
+  font-size: 13px;
+}
+
+.rec-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.rec-item {
+  display: flex;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 10px 8px;
+  border-radius: 4px;
+}
+
+.rec-item:hover {
+  background: #F6F7F8;
+}
+
+.rec-item:hover .rec-item-title {
+  color: #00AEEC;
+}
+
+.rec-cover {
+  position: relative;
+  width: 140px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #f0f0f0;
+}
+
+.rec-cover img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.2s ease;
+}
+
+.rec-item:hover .rec-cover img {
+  transform: scale(1.05);
+}
+
+.rec-duration {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  font-size: 11px;
+  padding: 2px 5px;
+  border-radius: 2px;
+  font-weight: 500;
+}
+
+.rec-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+
+.rec-item-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: #18191C;
+  line-height: 1.5;
+  margin: 0 0 8px 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.2s ease;
+}
+
+.rec-author {
+  font-size: 12px;
+  color: #9499A0;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rec-stats {
+  font-size: 12px;
+  color: #9499A0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 /* ==================== 响应式设计 ==================== */
+@media (max-width: 1024px) {
+  .video-content {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+
+  .right-column {
+    position: static;
+    max-height: none;
+  }
+
+  .rec-list {
+    max-height: 600px;
+    overflow-y: auto;
+  }
+}
+
 @media (max-width: 768px) {
-  .video-info-section,
+  .video-header,
+  .video-toolbar,
+  .video-desc,
   .comment-section {
-    margin-left: 16px;
-    margin-right: 16px;
-    padding: 20px;
+    padding: 16px;
   }
 
   .video-title {
-    font-size: 20px;
+    font-size: 18px;
   }
 
-  .author-like-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
+  .video-toolbar {
+    gap: 8px;
   }
 
-  .action-btns {
-    width: 100%;
-    justify-content: space-between;
+  .toolbar-btn {
+    padding: 10px 8px;
+  }
+
+  .toolbar-btn .text {
+    font-size: 12px;
   }
 
   .replies-list {
@@ -1300,6 +1651,14 @@ onUnmounted(() => {
 
   .reply-input-box.nested {
     margin-left: 12px;
+  }
+  
+  .rec-item {
+    flex-direction: column;
+  }
+  
+  .rec-cover {
+    width: 100%;
   }
 }
 </style>
