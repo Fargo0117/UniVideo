@@ -1,0 +1,14 @@
+---
+name: my-custom-rule
+description: This is a new rule
+---
+
+# Overview
+
+Insert overview text here. The agent will only see this should they choose to apply the rule.
+生成的代码要同时生成注释帮助用户和ai理解
+在生成代码之前检索一遍代码结构，避免冗余，在生成代码之后也要更新一遍结构记忆。
+在做完当前任务后要说明你都做了什么。
+尽量按照我的提示词去工作，如果你做了超出提示词外的事情一定要跟我说，检查自己的所作所为，我会判断并选择是否保留
+开发前端时要根据后端代码去实现
+改动后实时更新代码逻辑索引
