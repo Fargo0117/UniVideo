@@ -20,7 +20,10 @@ def create_app(config_name='development'):
     返回:
         配置好的Flask应用实例
     """
-    app = Flask(__name__)
+    # 设置静态文件夹路径，使得 /static 路由可以访问 backend/static 目录下的文件
+    app = Flask(__name__, 
+                static_folder='static',
+                static_url_path='/static')
     
     # 加载配置
     app.config.from_object(config[config_name])
