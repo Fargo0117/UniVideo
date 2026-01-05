@@ -162,11 +162,7 @@ const fetchMyCollections = async () => {
  */
 const switchTab = (tab) => {
   activeTab.value = tab
-  if (tab === 'videos' && myVideos.value.length === 0) {
-    fetchMyVideos()
-  } else if (tab === 'collections' && myCollections.value.length === 0) {
-    fetchMyCollections()
-  }
+  // 数据已在页面加载时获取，无需重复加载
 }
 
 /**
@@ -309,6 +305,7 @@ const goBack = () => {
 onMounted(() => {
   fetchUserInfo()
   fetchMyVideos()  // 默认加载我的投稿
+  fetchMyCollections()  // 同时加载我的收藏（用于显示数量）
 })
 </script>
 

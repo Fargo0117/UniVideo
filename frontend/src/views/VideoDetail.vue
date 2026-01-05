@@ -765,12 +765,12 @@ onUnmounted(() => {
 /* ==================== 视频播放器 - 影院模式 ==================== */
 .video-player-section {
   background: #0f0f0f;
-  padding: 40px 0;
+  padding: 40px 32px;
   margin-bottom: 0;
 }
 
 .artplayer-container {
-  max-width: 1200px;
+  max-width: 1000px;
   margin: 0 auto;
   aspect-ratio: 16 / 9;
   background-color: #000;
