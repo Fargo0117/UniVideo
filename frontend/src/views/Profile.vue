@@ -7,6 +7,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/api'
+import ImageCropperModal from '@/components/ImageCropperModal.vue'
 
 const router = useRouter()
 
@@ -40,6 +41,11 @@ const avatarFile = ref(null)
 const avatarPreview = ref('')
 const editSubmitting = ref(false)
 
+// 图片裁切相关
+const showCropper = ref(false)
+const tempAvatarUrl = ref('')
+const cropperAspectRatio = ref(1 / 1) // 头像使用正方形比例
+
 // ==================== 工具函数 ====================
 
 /**
@@ -48,6 +54,10 @@ const editSubmitting = ref(false)
 const getFullUrl = (path) => {
   if (!path) return ''
   if (path.startsWith('http')) return path
+  // 如果路径不以 / 开头，添加 /static/ 前缀
+  if (!path.startsWith('/')) {
+    return `http://localhost:5001/static/${path}`
+  }
   return `http://localhost:5001${path}`
 }
 
@@ -188,22 +198,40 @@ const handleAvatarChange = (event) => {
   const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp']
   if (!allowedTypes.includes(file.type)) {
     alert('请选择有效的图片格式 (png, jpg, jpeg, gif, webp)')
+    event.target.value = '' // 清空input
     return
   }
   
   // 验证文件大小 (最大 5MB)
   if (file.size > 5 * 1024 * 1024) {
     alert('图片大小不能超过 5MB')
+    event.target.value = '' // 清空input
     return
   }
   
-  avatarFile.value = file
-  // 预览图片
+  // 读取文件为Base64并打开裁切框
   const reader = new FileReader()
   reader.onload = (e) => {
-    avatarPreview.value = e.target.result
+    tempAvatarUrl.value = e.target.result
+    cropperAspectRatio.value = 1 / 1 // 头像使用正方形比例
+    showCropper.value = true
   }
   reader.readAsDataURL(file)
+  
+  // 清空input，以便下次选择同一文件也能触发change事件
+  event.target.value = ''
+}
+
+/**
+ * 处理裁切完成
+ */
+const handleCropConfirm = (blob) => {
+  // 将Blob转换为File对象
+  const file = new File([blob], 'avatar_cropped.png', { type: 'image/png' })
+  avatarFile.value = file
+  
+  // 创建预览URL
+  avatarPreview.value = URL.createObjectURL(blob)
 }
 
 /**
@@ -471,6 +499,15 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <!-- 图片裁切弹窗 -->
+    <ImageCropperModal
+      :visible="showCropper"
+      :img-src="tempAvatarUrl"
+      :aspect-ratio="cropperAspectRatio"
+      @update:visible="showCropper = $event"
+      @confirm="handleCropConfirm"
+    />
   </div>
 </template>
 

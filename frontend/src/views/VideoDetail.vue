@@ -1,11 +1,13 @@
 <script setup>
 /**
  * 视频详情页组件
- * 包含视频播放器、信息展示、点赞功能、收藏功能、评论区
+ * 包含 ArtPlayer 视频播放器（含弹幕）、信息展示、点赞功能、收藏功能、评论区
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/api'
+import Artplayer from 'artplayer'
+import artplayerPluginDanmuku from 'artplayer-plugin-danmuku'
 
 const route = useRoute()
 const router = useRouter()
@@ -40,6 +42,9 @@ const replySubmitting = ref(false)
 
 // 当前用户ID
 const currentUserId = localStorage.getItem('user_id')
+
+// ArtPlayer 实例
+const art = ref(null)
 
 // ==================== 工具函数 ====================
 
@@ -326,13 +331,97 @@ const goToAuthor = () => {
   }
 }
 
+/**
+ * 初始化 ArtPlayer 播放器
+ */
+const initPlayer = () => {
+  if (!video.value) return
+  
+  const videoUrl = getFullUrl(video.value.video_path)
+  const coverUrl = getFullUrl(video.value.cover_path)
+  
+  art.value = new Artplayer({
+    container: '#artplayer-app',
+    url: videoUrl,
+    poster: coverUrl,
+    title: video.value.title,
+    volume: 0.5,
+    autoSize: false,
+    fullscreen: true,
+    fullscreenWeb: true,
+    aspectRatio: true,
+    plugins: [
+      artplayerPluginDanmuku({
+        danmuku: async () => {
+          // 获取弹幕列表
+          try {
+            const response = await api.get(`/videos/${route.params.id}/danmaku`)
+            return response.data.data || []
+          } catch (err) {
+            console.error('获取弹幕失败:', err)
+            return []
+          }
+        },
+        speed: 5,
+        opacity: 1,
+        fontSize: 25,
+        color: '#FFFFFF',
+        mode: 0,
+        margin: [10, '25%'],
+        antiOverlap: true,
+        useWorker: true,
+        synchronousPlayback: false,
+        lockTime: 5,
+        maxLength: 50,
+        minWidth: 200,
+        maxWidth: 400,
+        theme: 'light',
+        // 配置发送弹幕的回调函数
+        emit: async (danmu) => {
+          // 发送弹幕到后端
+          try {
+            await api.post(`/videos/${route.params.id}/danmaku`, {
+              user_id: currentUserId,
+              text: danmu.text,
+              time: danmu.time,
+              color: danmu.color || '#FFFFFF'
+            })
+          } catch (err) {
+            console.error('发送弹幕失败:', err)
+            alert('发送弹幕失败，请稍后重试')
+          }
+        }
+      })
+    ]
+  })
+}
+
+/**
+ * 销毁 ArtPlayer 实例
+ */
+const destroyPlayer = () => {
+  if (art.value && art.value.destroy) {
+    art.value.destroy()
+    art.value = null
+  }
+}
+
 // ==================== 生命周期 ====================
 
-onMounted(() => {
-  fetchVideo()
+onMounted(async () => {
+  await fetchVideo()
   fetchLikeStatus()    // 获取当前用户的点赞状态
   fetchCollectStatus() // 获取当前用户的收藏状态
   fetchComments()
+  
+  // 视频数据加载完成后初始化播放器
+  if (video.value) {
+    initPlayer()
+  }
+})
+
+onUnmounted(() => {
+  destroyPlayer()
 })
 </script>
 
@@ -357,16 +446,9 @@ onMounted(() => {
 
     <!-- 视频内容 -->
     <main v-else-if="video" class="video-content">
-      <!-- 视频播放器 -->
+      <!-- ArtPlayer 视频播放器（含弹幕） -->
       <section class="video-player-section">
-        <video 
-          class="video-player"
-          :src="getFullUrl(video.video_path)" 
-          :poster="getFullUrl(video.cover_path)"
-          controls
-        >
-          您的浏览器不支持视频播放
-        </video>
+        <div id="artplayer-app" class="artplayer-container"></div>
       </section>
 
       <!-- 视频信息区 -->
@@ -648,10 +730,14 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
-.video-player {
+.artplayer-container {
   width: 100%;
-  max-height: 500px;
-  display: block;
+  aspect-ratio: 16 / 9;
+  max-height: 600px;
+  background-color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* ==================== 视频信息区 ==================== */

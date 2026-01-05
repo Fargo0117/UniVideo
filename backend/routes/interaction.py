@@ -1,9 +1,9 @@
 """
 互动路由模块
-提供评论、点赞等用户互动功能API接口
+提供评论、点赞、弹幕等用户互动功能API接口
 """
 from flask import Blueprint, request, jsonify
-from models import db, Comment, Like, Collection, Video, User
+from models import db, Comment, Like, Collection, Video, User, Danmaku
 
 # 创建互动蓝图
 interaction_bp = Blueprint('interaction', __name__)
@@ -397,6 +397,129 @@ def toggle_like(video_id):
                 'likes_count': likes_count
             }
         }), 200
+    
+    except Exception as e:
+        # 发生异常时回滚事务
+        db.session.rollback()
+        return jsonify({
+            'code': 500,
+            'msg': f'服务器错误: {str(e)}'
+        }), 500
+
+
+@interaction_bp.route('/videos/<int:video_id>/danmaku', methods=['GET'])
+def get_danmaku(video_id):
+    """
+    获取视频弹幕列表接口
+    返回该视频的所有弹幕，按时间排序
+    返回格式兼容 ArtPlayer 弹幕插件
+    """
+    try:
+        # 验证视频是否存在
+        video = Video.query.get(video_id)
+        if not video:
+            return jsonify({
+                'code': 404,
+                'msg': '视频不存在'
+            }), 404
+        
+        # 查询该视频的所有弹幕，按时间升序排列
+        danmakus = Danmaku.query.filter_by(
+            video_id=video_id
+        ).order_by(
+            Danmaku.time.asc()
+        ).all()
+        
+        # 转换为 ArtPlayer 弹幕插件要求的格式
+        danmaku_list = [danmaku.to_dict() for danmaku in danmakus]
+        
+        return jsonify({
+            'code': 0,  # ArtPlayer 要求 code=0 表示成功
+            'data': danmaku_list
+        }), 200
+    
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': f'服务器错误: {str(e)}'
+        }), 500
+
+
+@interaction_bp.route('/videos/<int:video_id>/danmaku', methods=['POST'])
+def create_danmaku(video_id):
+    """
+    发送弹幕接口
+    接收JSON: {user_id, text, time, color, mode?}
+    返回: 创建的弹幕信息
+    """
+    try:
+        # 获取请求数据
+        data = request.get_json()
+        
+        # 验证必填字段
+        if not data or not data.get('user_id') or not data.get('text'):
+            return jsonify({
+                'code': 400,
+                'msg': '缺少必填字段：user_id、text'
+            }), 400
+        
+        user_id = data.get('user_id')
+        text = data.get('text', '').strip()
+        time = data.get('time', 0)  # 弹幕出现的时间（秒）
+        color = data.get('color', '#FFFFFF')
+        mode = data.get('mode', 0)  # 0=滚动，1=顶部，2=底部
+        border = data.get('border', False)
+        
+        # 验证弹幕内容不能为空
+        if not text:
+            return jsonify({
+                'code': 400,
+                'msg': '弹幕内容不能为空'
+            }), 400
+        
+        # 验证弹幕内容长度
+        if len(text) > 100:
+            return jsonify({
+                'code': 400,
+                'msg': '弹幕内容不能超过100个字符'
+            }), 400
+        
+        # 验证视频是否存在
+        video = Video.query.get(video_id)
+        if not video:
+            return jsonify({
+                'code': 404,
+                'msg': '视频不存在'
+            }), 404
+        
+        # 验证用户是否存在
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({
+                'code': 404,
+                'msg': '用户不存在'
+            }), 404
+        
+        # 创建新弹幕
+        new_danmaku = Danmaku(
+            text=text,
+            time=time,
+            color=color,
+            mode=mode,
+            border=border,
+            user_id=user_id,
+            video_id=video_id
+        )
+        
+        # 保存到数据库
+        db.session.add(new_danmaku)
+        db.session.commit()
+        
+        return jsonify({
+            'code': 200,
+            'msg': '弹幕发送成功',
+            'data': new_danmaku.to_dict()
+        }), 201
     
     except Exception as e:
         # 发生异常时回滚事务

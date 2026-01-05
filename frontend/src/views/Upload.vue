@@ -6,6 +6,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/api'
+import ImageCropperModal from '@/components/ImageCropperModal.vue'
 
 const router = useRouter()
 
@@ -30,6 +31,11 @@ const videoRef = ref(null)        // video元素引用
 // 封面预览相关
 const coverPreviewUrl = ref('')   // 封面预览URL
 const isCaptured = ref(false)     // 是否为截取的封面
+
+// 图片裁切相关
+const showCropper = ref(false)
+const tempCoverUrl = ref('')
+const cropperAspectRatio = ref(16 / 9) // 封面使用16:9比例
 
 // 加载状态
 const loading = ref(false)
@@ -77,19 +83,53 @@ const handleVideoChange = (event) => {
  */
 const handleCoverChange = (event) => {
   const file = event.target.files[0]
-  if (file) {
-    coverFile.value = file
-    coverFileName.value = file.name
-    isCaptured.value = false  // 标记为非截取
-    
-    // 释放之前的预览URL
-    if (coverPreviewUrl.value) {
-      URL.revokeObjectURL(coverPreviewUrl.value)
-    }
-    
-    // 生成封面预览URL
-    coverPreviewUrl.value = URL.createObjectURL(file)
+  if (!file) return
+  
+  // 验证文件类型
+  const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp']
+  if (!allowedTypes.includes(file.type)) {
+    alert('请选择有效的图片格式 (png, jpg, jpeg, gif, webp)')
+    event.target.value = '' // 清空input
+    return
   }
+  
+  // 验证文件大小 (最大 10MB)
+  if (file.size > 10 * 1024 * 1024) {
+    alert('封面图片大小不能超过 10MB')
+    event.target.value = '' // 清空input
+    return
+  }
+  
+  // 读取文件为Base64并打开裁切框
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    tempCoverUrl.value = e.target.result
+    cropperAspectRatio.value = 16 / 9 // 封面使用16:9比例
+    showCropper.value = true
+  }
+  reader.readAsDataURL(file)
+  
+  // 清空input，以便下次选择同一文件也能触发change事件
+  event.target.value = ''
+}
+
+/**
+ * 处理裁切完成
+ */
+const handleCropConfirm = (blob) => {
+  // 将Blob转换为File对象
+  const file = new File([blob], 'cover_cropped.png', { type: 'image/png' })
+  coverFile.value = file
+  coverFileName.value = 'cover_cropped.png'
+  isCaptured.value = false // 标记为非截取（而是裁切）
+  
+  // 释放之前的预览URL
+  if (coverPreviewUrl.value) {
+    URL.revokeObjectURL(coverPreviewUrl.value)
+  }
+  
+  // 创建预览URL
+  coverPreviewUrl.value = URL.createObjectURL(blob)
 }
 
 /**
@@ -346,6 +386,15 @@ onUnmounted(() => {
         </button>
       </form>
     </div>
+
+    <!-- 图片裁切弹窗 -->
+    <ImageCropperModal
+      :visible="showCropper"
+      :img-src="tempCoverUrl"
+      :aspect-ratio="cropperAspectRatio"
+      @update:visible="showCropper = $event"
+      @confirm="handleCropConfirm"
+    />
   </div>
 </template>
 

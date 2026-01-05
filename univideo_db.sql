@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS `videos` (
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
   FOREIGN KEY (`category_id`) REFERENCES `categories`(`id`),
-  INDEX `idx_status` (`status`) /* 优化审核查询速度 */
+  INDEX `idx_status` (`status`), /* 优化审核查询速度 */
+  INDEX `idx_created_at` (`created_at`) /* 优化按时间排序 */
 ) COMMENT='视频信息表';
 
 /* 4. 评论表 (已更新：增加 root_id 和索引) */
@@ -74,3 +75,19 @@ CREATE TABLE IF NOT EXISTS `collections` (
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
   FOREIGN KEY (`video_id`) REFERENCES `videos`(`id`) ON DELETE CASCADE
 ) COMMENT='用户收藏表';
+
+/* 7. 弹幕表 */
+CREATE TABLE IF NOT EXISTS `danmaku` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY COMMENT '弹幕ID',
+  `user_id` INT NOT NULL COMMENT '发送者ID',
+  `video_id` INT NOT NULL COMMENT '所属视频ID',
+  `text` VARCHAR(100) NOT NULL COMMENT '弹幕文本内容',
+  `time` FLOAT NOT NULL COMMENT '弹幕出现时间（秒）',
+  `color` VARCHAR(20) DEFAULT '#FFFFFF' COMMENT '弹幕颜色',
+  `mode` TINYINT DEFAULT 0 COMMENT '弹幕模式: 0=滚动, 1=顶部, 2=底部',
+  `border` BOOLEAN DEFAULT FALSE COMMENT '是否显示边框',
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '发送时间',
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`video_id`) REFERENCES `videos`(`id`) ON DELETE CASCADE,
+  INDEX `idx_video_time` (`video_id`, `time`) /* 优化按视频查询弹幕 */
+) COMMENT='视频弹幕表';

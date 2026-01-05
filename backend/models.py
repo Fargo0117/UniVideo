@@ -340,3 +340,63 @@ class Collection(db.Model):
     
     def __repr__(self):
         return f'<Collection user_id={self.user_id} video_id={self.video_id}>'
+
+
+class Danmaku(db.Model):
+    """
+    弹幕模型：存储视频弹幕数据
+    对应 ArtPlayer 弹幕插件的数据格式要求
+    """
+    __tablename__ = 'danmaku'
+    
+    # 主键
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True, comment='弹幕ID')
+    # 弹幕内容
+    text = db.Column(db.String(100), nullable=False, comment='弹幕文本内容')
+    # 弹幕出现时间（视频播放时间，单位：秒）
+    time = db.Column(db.Float, nullable=False, comment='弹幕出现时间（秒）')
+    # 弹幕颜色（十六进制颜色值）
+    color = db.Column(db.String(20), default='#FFFFFF', comment='弹幕颜色')
+    # 弹幕模式（0=滚动，1=顶部，2=底部）
+    mode = db.Column(db.SmallInteger, default=0, comment='弹幕模式: 0=滚动, 1=顶部, 2=底部')
+    # 是否显示边框
+    border = db.Column(db.Boolean, default=False, comment='是否显示边框')
+    # 发送时间
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='发送时间')
+    
+    # 外键：关联用户表
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False, comment='发送者ID')
+    # 外键：关联视频表
+    video_id = db.Column(db.Integer, db.ForeignKey('videos.id', ondelete='CASCADE'), nullable=False, comment='所属视频ID')
+    
+    # 索引：优化按视频查询弹幕
+    __table_args__ = (
+        db.Index('idx_video_time', 'video_id', 'time'),
+    )
+    
+    # 关系定义
+    author = db.relationship('User', backref='danmakus')
+    video = db.relationship('Video', backref='danmakus')
+    
+    def to_dict(self, include_author=False):
+        """
+        将弹幕对象转换为字典格式
+        兼容 ArtPlayer 弹幕插件的数据格式
+        """
+        data = {
+            'id': self.id,
+            'text': self.text,
+            'time': self.time,
+            'color': self.color,
+            'mode': self.mode,
+            'border': self.border,
+        }
+        if include_author and self.author:
+            data['author'] = {
+                'id': self.author.id,
+                'nickname': self.author.nickname,
+            }
+        return data
+    
+    def __repr__(self):
+        return f'<Danmaku id={self.id} video_id={self.video_id}>'
