@@ -39,6 +39,23 @@ class User(db.Model):
     # 便捷关系：通过 secondary 关联表直接访问收藏的视频
     favorites = db.relationship('Video', secondary='collections', backref=db.backref('collected_by', lazy='dynamic'), lazy='dynamic')
     
+    # 关注关系：我关注的人
+    followed = db.relationship(
+        'Follow',
+        foreign_keys='Follow.follower_id',
+        backref=db.backref('follower', lazy='joined'),
+        lazy='dynamic',
+        cascade='all, delete-orphan'
+    )
+    # 关注关系：关注我的人
+    followers = db.relationship(
+        'Follow',
+        foreign_keys='Follow.followed_id',
+        backref=db.backref('followed', lazy='joined'),
+        lazy='dynamic',
+        cascade='all, delete-orphan'
+    )
+    
     def set_password(self, password):
         """
         设置用户密码：将明文密码转换为哈希值存储
@@ -64,6 +81,48 @@ class User(db.Model):
             bool: 是管理员返回 True，否则返回 False
         """
         return self.role == 'admin'
+    
+    def follow(self, user):
+        """
+        关注某个用户
+        参数:
+            user: 要关注的 User 对象
+        返回:
+            bool: 关注成功返回 True，如果已关注或自己关注自己返回 False
+        """
+        if user.id == self.id:
+            return False  # 不能关注自己
+        if not self.is_following(user):
+            follow = Follow(follower_id=self.id, followed_id=user.id)
+            db.session.add(follow)
+            return True
+        return False
+    
+    def unfollow(self, user):
+        """
+        取消关注某个用户
+        参数:
+            user: 要取消关注的 User 对象
+        返回:
+            bool: 取消关注成功返回 True，如果未关注返回 False
+        """
+        follow = self.followed.filter_by(followed_id=user.id).first()
+        if follow:
+            db.session.delete(follow)
+            return True
+        return False
+    
+    def is_following(self, user):
+        """
+        判断是否已关注某个用户
+        参数:
+            user: 要检查的 User 对象
+        返回:
+            bool: 已关注返回 True，否则返回 False
+        """
+        if user.id is None:
+            return False
+        return self.followed.filter_by(followed_id=user.id).first() is not None
     
     def to_dict(self):
         """
@@ -400,3 +459,47 @@ class Danmaku(db.Model):
     
     def __repr__(self):
         return f'<Danmaku id={self.id} video_id={self.video_id}>'
+
+
+class Follow(db.Model):
+    """
+    关注模型：记录用户之间的关注关系
+    对应 SQL: follows 表
+    """
+    __tablename__ = 'follows'
+    
+    # 联合主键：关注者ID + 被关注者ID
+    follower_id = db.Column(
+        db.Integer, 
+        db.ForeignKey('users.id', ondelete='CASCADE'), 
+        primary_key=True, 
+        comment='关注者ID'
+    )
+    followed_id = db.Column(
+        db.Integer, 
+        db.ForeignKey('users.id', ondelete='CASCADE'), 
+        primary_key=True, 
+        comment='被关注者ID'
+    )
+    # 关注时间
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, comment='关注时间')
+    
+    # 联合索引：优化查询某用户的关注列表和粉丝列表
+    __table_args__ = (
+        db.Index('idx_follower', 'follower_id'),
+        db.Index('idx_followed', 'followed_id'),
+        db.CheckConstraint('follower_id != followed_id', name='check_no_self_follow'),
+    )
+    
+    def to_dict(self):
+        """
+        将关注记录转换为字典格式
+        """
+        return {
+            'follower_id': self.follower_id,
+            'followed_id': self.followed_id,
+            'timestamp': self.timestamp.isoformat() if self.timestamp else None
+        }
+    
+    def __repr__(self):
+        return f'<Follow follower_id={self.follower_id} followed_id={self.followed_id}>'

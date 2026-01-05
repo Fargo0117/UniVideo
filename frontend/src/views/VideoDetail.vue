@@ -5,7 +5,7 @@
  */
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import api from '@/api'
+import api, { followUser, unfollowUser, getFollowStatus } from '@/api'
 import Artplayer from 'artplayer'
 import artplayerPluginDanmuku from 'artplayer-plugin-danmuku'
 
@@ -32,6 +32,10 @@ const likeLoading = ref(false)
 const collected = ref(false)
 const collectionsCount = ref(0)
 const collectLoading = ref(false)
+
+// 关注状态
+const isFollowing = ref(false)
+const followLoading = ref(false)
 
 // 评论数据
 const comments = ref([])
@@ -202,6 +206,25 @@ const fetchCollectStatus = async () => {
 }
 
 /**
+ * 获取当前用户对UP主的关注状态
+ * 进入页面时检查用户是否已关注该UP主
+ */
+const fetchFollowStatus = async () => {
+  // 未登录用户不需要检查关注状态
+  if (!currentUserId) return
+  // 不能关注自己
+  if (!video.value?.author?.id || video.value.author.id == currentUserId) return
+  
+  try {
+    const response = await getFollowStatus(video.value.author.id, currentUserId)
+    isFollowing.value = response.data.data?.is_following || false
+  } catch (err) {
+    console.error('获取关注状态失败:', err)
+    isFollowing.value = false
+  }
+}
+
+/**
  * 获取评论列表
  */
 const fetchComments = async () => {
@@ -264,6 +287,46 @@ const toggleCollect = async () => {
     alert(message)
   } finally {
     collectLoading.value = false
+  }
+}
+
+/**
+ * 关注/取消关注UP主
+ */
+const toggleFollow = async () => {
+  if (!currentUserId) {
+    alert('请先登录')
+    router.push('/login')
+    return
+  }
+  
+  if (!video.value?.author?.id) {
+    alert('UP主信息加载失败')
+    return
+  }
+  
+  followLoading.value = true
+  try {
+    if (isFollowing.value) {
+      // 取消关注
+      const response = await unfollowUser(video.value.author.id, currentUserId)
+      if (response.data.code === 200) {
+        isFollowing.value = false
+        alert('取消关注成功')
+      }
+    } else {
+      // 关注
+      const response = await followUser(video.value.author.id, currentUserId)
+      if (response.data.code === 200) {
+        isFollowing.value = true
+        alert('关注成功')
+      }
+    }
+  } catch (err) {
+    const message = err.response?.data?.msg || '操作失败'
+    alert(message)
+  } finally {
+    followLoading.value = false
   }
 }
 
@@ -460,6 +523,7 @@ const initPageData = async () => {
   // 重置状态
   liked.value = false
   collected.value = false
+  isFollowing.value = false
   comments.value = []
   relatedVideos.value = []
   
@@ -467,6 +531,7 @@ const initPageData = async () => {
   await fetchVideo()
   fetchLikeStatus()    // 获取当前用户的点赞状态
   fetchCollectStatus() // 获取当前用户的收藏状态
+  fetchFollowStatus()  // 获取当前用户对UP主的关注状态
   fetchComments()
   
   // 视频数据加载完成后初始化播放器
@@ -719,10 +784,13 @@ watch(() => route.params.id, (newId, oldId) => {
             </div>
             <button 
               class="follow-btn" 
+              :class="{ 'following': isFollowing }"
               v-if="currentUserId && currentUserId != video.author?.id"
+              :disabled="followLoading"
+              @click="toggleFollow"
             >
-              <span class="follow-icon">+</span>
-              <span class="follow-text">关注</span>
+              <span class="follow-icon">{{ isFollowing ? '✓' : '+' }}</span>
+              <span class="follow-text">{{ isFollowing ? '已关注' : '关注' }}</span>
             </button>
           </div>
         </div>
@@ -1466,6 +1534,22 @@ watch(() => route.params.id, (newId, oldId) => {
   background: #00A0DD;
   transform: translateY(-1px);
   box-shadow: 0 2px 6px rgba(0, 174, 236, 0.3);
+}
+
+.follow-btn.following {
+  background: #E3E5E7;
+  color: #9499A0;
+}
+
+.follow-btn.following:hover {
+  background: #C9CCD0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.follow-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .follow-icon {

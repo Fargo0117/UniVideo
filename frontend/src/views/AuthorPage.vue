@@ -5,7 +5,7 @@
  */
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import api from '@/api'
+import api, { followUser, unfollowUser, getFollowStatus } from '@/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -19,6 +19,13 @@ const error = ref(null)
 
 // 视频列表
 const videos = ref([])
+
+// 关注状态
+const isFollowing = ref(false)
+const followLoading = ref(false)
+
+// 当前用户ID
+const currentUserId = localStorage.getItem('user_id')
 
 // ==================== 工具函数 ====================
 
@@ -82,11 +89,70 @@ const fetchAuthorData = async () => {
     const response = await api.get(`/users/${route.params.id}`)
     author.value = response.data.data.user
     videos.value = response.data.data.videos.list
+    // 获取关注状态
+    if (currentUserId && author.value.id != currentUserId) {
+      fetchFollowStatus()
+    }
   } catch (err) {
     error.value = err.response?.data?.msg || '获取用户信息失败'
     console.error('获取用户信息失败:', err)
   } finally {
     loading.value = false
+  }
+}
+
+/**
+ * 获取当前用户对作者的关注状态
+ */
+const fetchFollowStatus = async () => {
+  if (!currentUserId || !author.value?.id) return
+  
+  try {
+    const response = await getFollowStatus(author.value.id, currentUserId)
+    isFollowing.value = response.data.data?.is_following || false
+  } catch (err) {
+    console.error('获取关注状态失败:', err)
+    isFollowing.value = false
+  }
+}
+
+/**
+ * 关注/取消关注作者
+ */
+const toggleFollow = async () => {
+  if (!currentUserId) {
+    alert('请先登录')
+    router.push('/login')
+    return
+  }
+  
+  if (!author.value?.id) {
+    alert('用户信息加载失败')
+    return
+  }
+  
+  followLoading.value = true
+  try {
+    if (isFollowing.value) {
+      // 取消关注
+      const response = await unfollowUser(author.value.id, currentUserId)
+      if (response.data.code === 200) {
+        isFollowing.value = false
+        alert('取消关注成功')
+      }
+    } else {
+      // 关注
+      const response = await followUser(author.value.id, currentUserId)
+      if (response.data.code === 200) {
+        isFollowing.value = true
+        alert('关注成功')
+      }
+    }
+  } catch (err) {
+    const message = err.response?.data?.msg || '操作失败'
+    alert(message)
+  } finally {
+    followLoading.value = false
   }
 }
 
@@ -151,6 +217,17 @@ onMounted(() => {
               </span>
             </p>
           </div>
+          <!-- 关注按钮 -->
+          <button 
+            v-if="currentUserId && currentUserId != author.id"
+            class="follow-btn"
+            :class="{ 'following': isFollowing }"
+            :disabled="followLoading"
+            @click="toggleFollow"
+          >
+            <span class="follow-icon">{{ isFollowing ? '✓' : '+' }}</span>
+            <span class="follow-text">{{ isFollowing ? '已关注' : '关注' }}</span>
+          </button>
         </div>
       </section>
 
@@ -458,6 +535,55 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+/* 关注按钮 */
+.follow-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 24px;
+  background: #409eff;
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  align-self: flex-start;
+  margin-top: 8px;
+}
+
+.follow-btn:hover {
+  background: #66b1ff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+}
+
+.follow-btn.following {
+  background: #f0f0f0;
+  color: #666;
+}
+
+.follow-btn.following:hover {
+  background: #e0e0e0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.follow-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.follow-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.follow-text {
+  line-height: 1;
 }
 
 /* 响应式设计 */

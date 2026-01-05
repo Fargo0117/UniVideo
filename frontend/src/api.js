@@ -36,5 +36,60 @@ api.interceptors.request.use(
   }
 )
 
+// ==================== 关注功能 API ====================
+
+/**
+ * 关注用户
+ * @param {number} targetUserId - 要关注的用户ID
+ * @param {number} currentUserId - 当前登录用户ID
+ */
+export const followUser = (targetUserId, currentUserId) => {
+  return api.post(`/follow/${targetUserId}`, { user_id: currentUserId })
+}
+
+/**
+ * 取消关注用户
+ * @param {number} targetUserId - 要取消关注的用户ID
+ * @param {number} currentUserId - 当前登录用户ID
+ */
+export const unfollowUser = (targetUserId, currentUserId) => {
+  return api.post(`/unfollow/${targetUserId}`, { user_id: currentUserId })
+}
+
+/**
+ * 获取用户的粉丝列表
+ * @param {number} userId - 用户ID
+ * @param {number} page - 页码（默认1）
+ * @param {number} perPage - 每页数量（默认20）
+ */
+export const getFollowers = (userId, page = 1, perPage = 20) => {
+  return api.get(`/users/${userId}/followers`, {
+    params: { page, per_page: perPage }
+  })
+}
+
+/**
+ * 获取用户的关注列表
+ * @param {number} userId - 用户ID
+ * @param {number} page - 页码（默认1）
+ * @param {number} perPage - 每页数量（默认20）
+ */
+export const getFollowing = (userId, page = 1, perPage = 20) => {
+  return api.get(`/users/${userId}/following`, {
+    params: { page, per_page: perPage }
+  })
+}
+
+/**
+ * 查询当前用户是否关注了指定用户
+ * @param {number} targetUserId - 目标用户ID
+ * @param {number} currentUserId - 当前登录用户ID
+ */
+export const getFollowStatus = (targetUserId, currentUserId) => {
+  return api.get(`/users/${targetUserId}/follow_status`, {
+    params: { current_user_id: currentUserId }
+  })
+}
+
 // 导出配置好的 axios 实例
 export default api

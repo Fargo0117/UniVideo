@@ -266,12 +266,20 @@ onUnmounted(() => {
 
 <template>
   <div class="upload-container">
+    <!-- 独立顶部工具栏 -->
+    <header class="upload-header">
+      <button class="exit-btn" @click="goBack">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        <span>退出创作</span>
+      </button>
+      <h1 class="header-title">投稿工作室</h1>
+      <div class="header-spacer"></div>
+    </header>
+
+    <!-- 内容区域 -->
     <div class="upload-card">
-      <!-- 页面标题 -->
-      <div class="card-header">
-        <button class="back-btn" @click="goBack">&larr; 返回</button>
-        <h2 class="title">上传视频</h2>
-      </div>
 
       <!-- 上传表单 -->
       <form class="upload-form" @submit.prevent="handleSubmit">
@@ -402,48 +410,78 @@ onUnmounted(() => {
 /* 页面容器 */
 .upload-container {
   min-height: 100vh;
+  background-color: #f4f5f7;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #f5f5f5;
-  padding: 24px;
+  flex-direction: column;
 }
 
-/* 上传卡片 */
+/* ==================== 顶部工具栏 ==================== */
+.upload-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  height: 60px;
+  background: #fff;
+  border-bottom: 1px solid #E3E5E7;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.exit-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: none;
+  border: 1px solid #E3E5E7;
+  border-radius: 4px;
+  color: #18191C;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.exit-btn:hover {
+  background: #F6F7F8;
+  border-color: #C9CCD0;
+  color: #FF5252;
+}
+
+.exit-btn svg {
+  transition: transform 0.2s ease;
+}
+
+.exit-btn:hover svg {
+  transform: translateX(-2px);
+}
+
+.header-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 18px;
+  font-weight: 600;
+  color: #18191C;
+  margin: 0;
+}
+
+.header-spacer {
+  width: 120px; /* 占位，保持居中 */
+}
+
+/* ==================== 内容区域 ==================== */
 .upload-card {
   width: 100%;
-  max-width: 600px;
+  max-width: 700px;
+  margin: 40px auto;
   background: #fff;
   border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-  padding: 32px;
-}
-
-/* 卡片头部 */
-.card-header {
-  display: flex;
-  align-items: center;
-  margin-bottom: 24px;
-}
-
-.back-btn {
-  background: none;
-  border: none;
-  color: #409eff;
-  font-size: 14px;
-  cursor: pointer;
-  padding: 4px 8px;
-  margin-right: 16px;
-}
-
-.back-btn:hover {
-  text-decoration: underline;
-}
-
-.title {
-  font-size: 24px;
-  color: #333;
-  margin: 0;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  padding: 40px;
 }
 
 /* 表单样式 */

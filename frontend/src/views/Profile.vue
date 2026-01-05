@@ -6,7 +6,7 @@
  */
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import api from '@/api'
+import api, { getFollowers, getFollowing, followUser, unfollowUser, getFollowStatus } from '@/api'
 import ImageCropperModal from '@/components/ImageCropperModal.vue'
 
 const router = useRouter()
@@ -21,7 +21,7 @@ const userLoading = ref(true)
 const currentUserId = localStorage.getItem('user_id')
 
 // 选项卡状态
-const activeTab = ref('videos') // 'videos' | 'collections'
+const activeTab = ref('videos') // 'videos' | 'collections' | 'following' | 'followers'
 
 // 我的投稿
 const myVideos = ref([])
@@ -30,6 +30,17 @@ const videosLoading = ref(false)
 // 我的收藏
 const myCollections = ref([])
 const collectionsLoading = ref(false)
+
+// 我的关注
+const myFollowing = ref([])
+const followingLoading = ref(false)
+
+// 我的粉丝
+const myFollowers = ref([])
+const followersLoading = ref(false)
+
+// 关注状态映射（用于管理每个用户的关注状态）
+const followStatusMap = ref({})
 
 // 修改资料弹窗
 const showEditModal = ref(false)
@@ -154,6 +165,97 @@ const fetchMyCollections = async () => {
     myCollections.value = []
   } finally {
     collectionsLoading.value = false
+  }
+}
+
+/**
+ * 获取我的关注列表
+ */
+const fetchMyFollowing = async () => {
+  followingLoading.value = true
+  try {
+    const response = await getFollowing(currentUserId)
+    myFollowing.value = response.data.data?.list || []
+    // 初始化关注状态映射（关注列表中的用户都是已关注）
+    myFollowing.value.forEach(user => {
+      followStatusMap.value[user.id] = true
+    })
+  } catch (err) {
+    console.error('获取我的关注失败:', err)
+    myFollowing.value = []
+  } finally {
+    followingLoading.value = false
+  }
+}
+
+/**
+ * 获取我的粉丝列表
+ */
+const fetchMyFollowers = async () => {
+  followersLoading.value = true
+  try {
+    const response = await getFollowers(currentUserId)
+    myFollowers.value = response.data.data?.list || []
+    // 获取每个粉丝的关注状态
+    for (const follower of myFollowers.value) {
+      await checkFollowStatus(follower.id)
+    }
+  } catch (err) {
+    console.error('获取我的粉丝失败:', err)
+    myFollowers.value = []
+  } finally {
+    followersLoading.value = false
+  }
+}
+
+/**
+ * 检查对某个用户的关注状态
+ */
+const checkFollowStatus = async (userId) => {
+  try {
+    const response = await getFollowStatus(userId, currentUserId)
+    followStatusMap.value[userId] = response.data.data?.is_following || false
+  } catch (err) {
+    console.error('获取关注状态失败:', err)
+    followStatusMap.value[userId] = false
+  }
+}
+
+/**
+ * 切换关注状态
+ */
+const toggleFollowUser = async (user) => {
+  if (!currentUserId) {
+    alert('请先登录')
+    router.push('/login')
+    return
+  }
+  
+  try {
+    const isCurrentlyFollowing = followStatusMap.value[user.id]
+    
+    if (isCurrentlyFollowing) {
+      // 取消关注
+      const response = await unfollowUser(user.id, currentUserId)
+      if (response.data.code === 200) {
+        followStatusMap.value[user.id] = false
+        alert('取消关注成功')
+        // 如果在关注列表页，从列表中移除
+        if (activeTab.value === 'following') {
+          myFollowing.value = myFollowing.value.filter(u => u.id !== user.id)
+        }
+      }
+    } else {
+      // 关注
+      const response = await followUser(user.id, currentUserId)
+      if (response.data.code === 200) {
+        followStatusMap.value[user.id] = true
+        alert('关注成功')
+      }
+    }
+  } catch (err) {
+    const message = err.response?.data?.msg || '操作失败'
+    alert(message)
   }
 }
 
@@ -294,6 +396,13 @@ const goToVideo = (videoId) => {
 }
 
 /**
+ * 跳转到用户主页
+ */
+const goToAuthor = (userId) => {
+  router.push(`/author/${userId}`)
+}
+
+/**
  * 返回首页
  */
 const goBack = () => {
@@ -306,6 +415,8 @@ onMounted(() => {
   fetchUserInfo()
   fetchMyVideos()  // 默认加载我的投稿
   fetchMyCollections()  // 同时加载我的收藏（用于显示数量）
+  fetchMyFollowing()  // 加载我的关注
+  fetchMyFollowers()  // 加载我的粉丝
 })
 </script>
 
@@ -361,6 +472,20 @@ onMounted(() => {
             @click="switchTab('collections')"
           >
             我的收藏 ({{ myCollections.length }})
+          </button>
+          <button 
+            class="tab-btn" 
+            :class="{ active: activeTab === 'following' }"
+            @click="switchTab('following')"
+          >
+            我的关注 ({{ myFollowing.length }})
+          </button>
+          <button 
+            class="tab-btn" 
+            :class="{ active: activeTab === 'followers' }"
+            @click="switchTab('followers')"
+          >
+            我的粉丝 ({{ myFollowers.length }})
           </button>
         </div>
 
@@ -427,6 +552,79 @@ onMounted(() => {
                   <span>{{ video.likes_count || 0 }} 点赞</span>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 我的关注内容 -->
+        <div v-if="activeTab === 'following'" class="tab-content">
+          <div v-if="followingLoading" class="loading-state">
+            <p>加载中...</p>
+          </div>
+          <div v-else-if="myFollowing.length === 0" class="empty-state">
+            <p>暂无关注，去发现更多有趣的UP主吧！</p>
+            <button class="btn btn-primary" @click="goBack">浏览视频</button>
+          </div>
+          <div v-else class="user-list">
+            <div 
+              v-for="user in myFollowing" 
+              :key="user.id" 
+              class="user-item"
+            >
+              <img 
+                class="user-avatar" 
+                :src="getFullUrl(user.avatar) || 'https://via.placeholder.com/50'"
+                :alt="user.nickname"
+                @error="(e) => e.target.src = 'https://via.placeholder.com/50'"
+                @click="goToAuthor(user.id)"
+              />
+              <div class="user-info-text" @click="goToAuthor(user.id)">
+                <h4 class="user-name">{{ user.nickname || '用户' }}</h4>
+                <p class="user-desc">学号：{{ user.username }}</p>
+              </div>
+              <button 
+                class="btn-follow"
+                :class="{ 'following': followStatusMap[user.id] }"
+                @click="toggleFollowUser(user)"
+              >
+                {{ followStatusMap[user.id] ? '已关注' : '关注' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 我的粉丝内容 -->
+        <div v-if="activeTab === 'followers'" class="tab-content">
+          <div v-if="followersLoading" class="loading-state">
+            <p>加载中...</p>
+          </div>
+          <div v-else-if="myFollowers.length === 0" class="empty-state">
+            <p>暂无粉丝</p>
+          </div>
+          <div v-else class="user-list">
+            <div 
+              v-for="user in myFollowers" 
+              :key="user.id" 
+              class="user-item"
+            >
+              <img 
+                class="user-avatar" 
+                :src="getFullUrl(user.avatar) || 'https://via.placeholder.com/50'"
+                :alt="user.nickname"
+                @error="(e) => e.target.src = 'https://via.placeholder.com/50'"
+                @click="goToAuthor(user.id)"
+              />
+              <div class="user-info-text" @click="goToAuthor(user.id)">
+                <h4 class="user-name">{{ user.nickname || '用户' }}</h4>
+                <p class="user-desc">学号：{{ user.username }}</p>
+              </div>
+              <button 
+                class="btn-follow"
+                :class="{ 'following': followStatusMap[user.id] }"
+                @click="toggleFollowUser(user)"
+              >
+                {{ followStatusMap[user.id] ? '已关注' : '关注' }}
+              </button>
             </div>
           </div>
         </div>
@@ -750,6 +948,96 @@ onMounted(() => {
   gap: 12px;
   font-size: 12px;
   color: #999;
+}
+
+/* ==================== 用户列表 ==================== */
+.user-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.user-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+
+.user-item:hover {
+  background: #f0f0f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.user-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  cursor: pointer;
+  border: 2px solid #fff;
+  transition: transform 0.3s;
+}
+
+.user-avatar:hover {
+  transform: scale(1.1);
+}
+
+.user-info-text {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.user-name {
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  margin: 0 0 4px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-desc {
+  font-size: 13px;
+  color: #999;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-follow {
+  padding: 8px 20px;
+  background: #409eff;
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+  flex-shrink: 0;
+}
+
+.btn-follow:hover {
+  background: #66b1ff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+}
+
+.btn-follow.following {
+  background: #f0f0f0;
+  color: #666;
+}
+
+.btn-follow.following:hover {
+  background: #e0e0e0;
 }
 
 /* ==================== 按钮样式 ==================== */

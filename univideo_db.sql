@@ -91,3 +91,16 @@ CREATE TABLE IF NOT EXISTS `danmaku` (
   FOREIGN KEY (`video_id`) REFERENCES `videos`(`id`) ON DELETE CASCADE,
   INDEX `idx_video_time` (`video_id`, `time`) /* 优化按视频查询弹幕 */
 ) COMMENT='视频弹幕表';
+
+/* 8. 关注关系表 */
+CREATE TABLE IF NOT EXISTS `follows` (
+  `follower_id` INT NOT NULL COMMENT '关注者ID',
+  `followed_id` INT NOT NULL COMMENT '被关注者ID',
+  `timestamp` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '关注时间',
+  PRIMARY KEY (`follower_id`, `followed_id`),
+  FOREIGN KEY (`follower_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`followed_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `check_no_self_follow` CHECK (`follower_id` != `followed_id`),
+  INDEX `idx_follower` (`follower_id`), /* 优化查询某用户的关注列表 */
+  INDEX `idx_followed` (`followed_id`)  /* 优化查询某用户的粉丝列表 */
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户关注关系表';

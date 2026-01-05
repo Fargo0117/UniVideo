@@ -1,9 +1,9 @@
 """
 互动路由模块
-提供评论、点赞、弹幕等用户互动功能API接口
+提供评论、点赞、弹幕、关注等用户互动功能API接口
 """
 from flask import Blueprint, request, jsonify
-from models import db, Comment, Like, Collection, Video, User, Danmaku
+from models import db, Comment, Like, Collection, Video, User, Danmaku, Follow
 
 # 创建互动蓝图
 interaction_bp = Blueprint('interaction', __name__)
@@ -524,6 +524,325 @@ def create_danmaku(video_id):
     except Exception as e:
         # 发生异常时回滚事务
         db.session.rollback()
+        return jsonify({
+            'code': 500,
+            'msg': f'服务器错误: {str(e)}'
+        }), 500
+
+
+@interaction_bp.route('/follow/<int:user_id>', methods=['POST'])
+def follow_user(user_id):
+    """
+    关注指定用户接口
+    接收JSON: {user_id: 当前登录用户ID}
+    路径参数: user_id (要关注的用户ID)
+    返回: 关注状态
+    """
+    try:
+        # 获取请求数据
+        data = request.get_json()
+        
+        # 验证必填字段
+        if not data or not data.get('user_id'):
+            return jsonify({
+                'code': 400,
+                'msg': '缺少必填字段：user_id'
+            }), 400
+        
+        current_user_id = data.get('user_id')
+        
+        # 验证不能关注自己
+        if current_user_id == user_id:
+            return jsonify({
+                'code': 400,
+                'msg': '不能关注自己'
+            }), 400
+        
+        # 验证当前用户是否存在
+        current_user = User.query.get(current_user_id)
+        if not current_user:
+            return jsonify({
+                'code': 404,
+                'msg': '当前用户不存在'
+            }), 404
+        
+        # 验证要关注的用户是否存在
+        target_user = User.query.get(user_id)
+        if not target_user:
+            return jsonify({
+                'code': 404,
+                'msg': '要关注的用户不存在'
+            }), 404
+        
+        # 检查是否已经关注
+        if current_user.is_following(target_user):
+            return jsonify({
+                'code': 400,
+                'msg': '已经关注该用户'
+            }), 400
+        
+        # 执行关注操作
+        current_user.follow(target_user)
+        db.session.commit()
+        
+        return jsonify({
+            'code': 200,
+            'msg': '关注成功',
+            'data': {
+                'is_following': True
+            }
+        }), 200
+    
+    except Exception as e:
+        # 发生异常时回滚事务
+        db.session.rollback()
+        return jsonify({
+            'code': 500,
+            'msg': f'服务器错误: {str(e)}'
+        }), 500
+
+
+@interaction_bp.route('/unfollow/<int:user_id>', methods=['POST'])
+def unfollow_user(user_id):
+    """
+    取消关注指定用户接口
+    接收JSON: {user_id: 当前登录用户ID}
+    路径参数: user_id (要取消关注的用户ID)
+    返回: 关注状态
+    """
+    try:
+        # 获取请求数据
+        data = request.get_json()
+        
+        # 验证必填字段
+        if not data or not data.get('user_id'):
+            return jsonify({
+                'code': 400,
+                'msg': '缺少必填字段：user_id'
+            }), 400
+        
+        current_user_id = data.get('user_id')
+        
+        # 验证当前用户是否存在
+        current_user = User.query.get(current_user_id)
+        if not current_user:
+            return jsonify({
+                'code': 404,
+                'msg': '当前用户不存在'
+            }), 404
+        
+        # 验证要取消关注的用户是否存在
+        target_user = User.query.get(user_id)
+        if not target_user:
+            return jsonify({
+                'code': 404,
+                'msg': '要取消关注的用户不存在'
+            }), 404
+        
+        # 检查是否已关注
+        if not current_user.is_following(target_user):
+            return jsonify({
+                'code': 400,
+                'msg': '未关注该用户'
+            }), 400
+        
+        # 执行取消关注操作
+        current_user.unfollow(target_user)
+        db.session.commit()
+        
+        return jsonify({
+            'code': 200,
+            'msg': '取消关注成功',
+            'data': {
+                'is_following': False
+            }
+        }), 200
+    
+    except Exception as e:
+        # 发生异常时回滚事务
+        db.session.rollback()
+        return jsonify({
+            'code': 500,
+            'msg': f'服务器错误: {str(e)}'
+        }), 500
+
+
+@interaction_bp.route('/users/<int:user_id>/followers', methods=['GET'])
+def get_user_followers(user_id):
+    """
+    获取指定用户的粉丝列表接口
+    路径参数: user_id (用户ID)
+    查询参数: 
+        - page: 页码（默认1）
+        - per_page: 每页数量（默认20）
+    返回: 粉丝列表（包含用户基本信息）
+    """
+    try:
+        # 验证用户是否存在
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({
+                'code': 404,
+                'msg': '用户不存在'
+            }), 404
+        
+        # 获取分页参数
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        
+        # 限制每页数量
+        if per_page > 100:
+            per_page = 100
+        
+        # 查询粉丝列表（关注该用户的人）
+        followers_query = user.followers.paginate(
+            page=page,
+            per_page=per_page,
+            error_out=False
+        )
+        
+        # 构建粉丝列表
+        followers_list = []
+        for follow in followers_query.items:
+            follower = follow.follower  # 关注者
+            followers_list.append({
+                'id': follower.id,
+                'username': follower.username,
+                'nickname': follower.nickname,
+                'avatar': follower.avatar,
+                'followed_at': follow.timestamp.isoformat() if follow.timestamp else None
+            })
+        
+        return jsonify({
+            'code': 200,
+            'msg': '获取成功',
+            'data': {
+                'total': followers_query.total,
+                'page': page,
+                'per_page': per_page,
+                'pages': followers_query.pages,
+                'list': followers_list
+            }
+        }), 200
+    
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': f'服务器错误: {str(e)}'
+        }), 500
+
+
+@interaction_bp.route('/users/<int:user_id>/following', methods=['GET'])
+def get_user_following(user_id):
+    """
+    获取指定用户的关注列表接口
+    路径参数: user_id (用户ID)
+    查询参数: 
+        - page: 页码（默认1）
+        - per_page: 每页数量（默认20）
+    返回: 关注列表（包含用户基本信息）
+    """
+    try:
+        # 验证用户是否存在
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({
+                'code': 404,
+                'msg': '用户不存在'
+            }), 404
+        
+        # 获取分页参数
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        
+        # 限制每页数量
+        if per_page > 100:
+            per_page = 100
+        
+        # 查询关注列表（该用户关注的人）
+        following_query = user.followed.paginate(
+            page=page,
+            per_page=per_page,
+            error_out=False
+        )
+        
+        # 构建关注列表
+        following_list = []
+        for follow in following_query.items:
+            followed = follow.followed  # 被关注者
+            following_list.append({
+                'id': followed.id,
+                'username': followed.username,
+                'nickname': followed.nickname,
+                'avatar': followed.avatar,
+                'followed_at': follow.timestamp.isoformat() if follow.timestamp else None
+            })
+        
+        return jsonify({
+            'code': 200,
+            'msg': '获取成功',
+            'data': {
+                'total': following_query.total,
+                'page': page,
+                'per_page': per_page,
+                'pages': following_query.pages,
+                'list': following_list
+            }
+        }), 200
+    
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': f'服务器错误: {str(e)}'
+        }), 500
+
+
+@interaction_bp.route('/users/<int:user_id>/follow_status', methods=['GET'])
+def get_follow_status(user_id):
+    """
+    查询当前登录用户是否关注了指定用户
+    路径参数: user_id (要查询的用户ID)
+    查询参数: current_user_id (当前登录用户ID)
+    返回: 关注状态（boolean）
+    """
+    try:
+        # 获取当前用户ID
+        current_user_id = request.args.get('current_user_id')
+        
+        if not current_user_id:
+            return jsonify({
+                'code': 400,
+                'msg': '缺少参数：current_user_id'
+            }), 400
+        
+        # 验证当前用户是否存在
+        current_user = User.query.get(current_user_id)
+        if not current_user:
+            return jsonify({
+                'code': 404,
+                'msg': '当前用户不存在'
+            }), 404
+        
+        # 验证目标用户是否存在
+        target_user = User.query.get(user_id)
+        if not target_user:
+            return jsonify({
+                'code': 404,
+                'msg': '目标用户不存在'
+            }), 404
+        
+        # 检查是否已关注
+        is_following = current_user.is_following(target_user)
+        
+        return jsonify({
+            'code': 200,
+            'msg': '获取成功',
+            'data': {
+                'is_following': is_following
+            }
+        }), 200
+    
+    except Exception as e:
         return jsonify({
             'code': 500,
             'msg': f'服务器错误: {str(e)}'

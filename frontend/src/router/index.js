@@ -33,7 +33,7 @@ const router = createRouter({
       path: '/upload',
       name: 'upload',
       component: () => import('../views/Upload.vue'),
-      meta: { hideNavbar: false }
+      meta: { hideNavbar: true, requiresAuth: true }
     },
     {
       // 视频详情页
