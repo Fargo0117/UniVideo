@@ -163,12 +163,6 @@ const goToVideo = (videoId) => {
   router.push(`/video/${videoId}`)
 }
 
-/**
- * 返回上一页
- */
-const goBack = () => {
-  router.back()
-}
 
 // ==================== 生命周期 ====================
 
@@ -181,7 +175,6 @@ onMounted(() => {
   <div class="author-page-container">
     <!-- 顶部导航 -->
     <header class="nav-bar">
-      <button class="back-btn" @click="goBack">&larr; 返回</button>
       <span class="site-name">UniVideo</span>
     </header>
 
@@ -193,7 +186,7 @@ onMounted(() => {
     <!-- 错误状态 -->
     <div v-else-if="error" class="error-state">
       <p>{{ error }}</p>
-      <button class="btn btn-primary" @click="goBack">返回</button>
+      <button class="btn btn-primary" @click="$router.back()">返回</button>
     </div>
 
     <!-- 主内容 -->
@@ -296,21 +289,7 @@ onMounted(() => {
   z-index: 100;
 }
 
-.back-btn {
-  background: none;
-  border: none;
-  color: #409eff;
-  font-size: 14px;
-  cursor: pointer;
-  padding: 8px 0;
-}
-
-.back-btn:hover {
-  text-decoration: underline;
-}
-
 .site-name {
-  margin-left: 16px;
   font-size: 18px;
   font-weight: bold;
   color: #409eff;

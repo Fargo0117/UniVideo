@@ -402,12 +402,6 @@ const goToAuthor = (userId) => {
   router.push(`/author/${userId}`)
 }
 
-/**
- * 返回首页
- */
-const goBack = () => {
-  router.push('/')
-}
 
 // ==================== 生命周期 ====================
 
@@ -424,7 +418,6 @@ onMounted(() => {
   <div class="profile-container">
     <!-- 顶部导航 -->
     <header class="nav-bar">
-      <button class="back-btn" @click="goBack">&larr; 返回首页</button>
       <span class="site-name">UniVideo - 个人主页</span>
     </header>
 
@@ -530,7 +523,7 @@ onMounted(() => {
           </div>
           <div v-else-if="myCollections.length === 0" class="empty-state">
             <p>暂无收藏，去发现更多有趣的视频吧！</p>
-            <button class="btn btn-primary" @click="goBack">浏览视频</button>
+            <button class="btn btn-primary" @click="$router.push('/')">浏览视频</button>
           </div>
           <div v-else class="video-grid">
             <div 
@@ -563,7 +556,7 @@ onMounted(() => {
           </div>
           <div v-else-if="myFollowing.length === 0" class="empty-state">
             <p>暂无关注，去发现更多有趣的UP主吧！</p>
-            <button class="btn btn-primary" @click="goBack">浏览视频</button>
+            <button class="btn btn-primary" @click="$router.push('/')">浏览视频</button>
           </div>
           <div v-else class="user-list">
             <div 
@@ -726,21 +719,7 @@ onMounted(() => {
   z-index: 100;
 }
 
-.back-btn {
-  background: none;
-  border: none;
-  color: #409eff;
-  font-size: 14px;
-  cursor: pointer;
-  padding: 8px 0;
-}
-
-.back-btn:hover {
-  text-decoration: underline;
-}
-
 .site-name {
-  margin-left: 16px;
   font-size: 18px;
   font-weight: bold;
   color: #409eff;

@@ -412,12 +412,6 @@ const submitReply = async () => {
   }
 }
 
-/**
- * 返回首页
- */
-const goBack = () => {
-  router.push('/')
-}
 
 /**
  * 跳转到作者主页
@@ -560,7 +554,6 @@ watch(() => route.params.id, (newId, oldId) => {
   <div class="video-detail-container">
     <!-- 顶部导航 -->
     <header class="nav-bar">
-      <button class="back-btn" @click="goBack">&larr; 返回首页</button>
       <span class="site-name">UniVideo</span>
     </header>
 
@@ -572,7 +565,7 @@ watch(() => route.params.id, (newId, oldId) => {
     <!-- 错误状态 -->
     <div v-else-if="error" class="error-state">
       <p>{{ error }}</p>
-      <button class="btn btn-primary" @click="goBack">返回首页</button>
+      <button class="btn btn-primary" @click="$router.push('/')">返回首页</button>
     </div>
 
     <!-- 视频内容 -->
@@ -863,25 +856,7 @@ watch(() => route.params.id, (newId, oldId) => {
   z-index: 1000;
 }
 
-.back-btn {
-  background: none;
-  border: none;
-  color: var(--primary-color, #FF5252);
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 8px 16px;
-  border-radius: 8px;
-  transition: all 0.3s ease;
-}
-
-.back-btn:hover {
-  background: rgba(255, 82, 82, 0.1);
-  transform: translateX(-4px);
-}
-
 .site-name {
-  margin-left: 16px;
   font-size: 22px;
   font-weight: 700;
   background: linear-gradient(135deg, #FF5252 0%, #FF7070 100%);
