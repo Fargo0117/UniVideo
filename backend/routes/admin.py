@@ -311,7 +311,7 @@ def send_notification():
     """
     发送通知接口（仅管理员可用）
     参数:
-        - user_id (可选): 接收用户ID，如果为空则视为群发/广播（暂只实现指定ID发送）
+        - target_username (可选): 接收用户名，如果为空则视为群发/广播（系统通知，所有用户可见）
         - title: 消息标题
         - content: 消息正文
         - msg_type (可选): 消息类型，默认为 'system'，可选值: 'system', 'audit', 'interaction'
@@ -329,11 +329,12 @@ def send_notification():
                 'msg': '缺少请求数据'
             }), 400
         
-        title = data.get('title', '').strip()
-        content = data.get('content', '').strip()
-        user_id = data.get('user_id')
+        # 安全地获取并处理字符串字段（处理 None 值）
+        title = (data.get('title') or '').strip()
+        content = (data.get('content') or '').strip()
+        target_username = (data.get('target_username') or '').strip()
         msg_type = data.get('msg_type', Notification.MSG_TYPE_SYSTEM)
-        related_link = data.get('related_link')
+        related_link = (data.get('related_link') or '').strip() or None
         
         # 验证必填字段
         if not title:
@@ -356,14 +357,18 @@ def send_notification():
                 'msg': f'msg_type 参数无效，仅支持: {", ".join(valid_types)}'
             }), 400
         
-        # 验证用户ID（如果提供）
-        if user_id:
-            user = User.query.get(user_id)
+        # 处理用户查找逻辑
+        user_id = None
+        if target_username:
+            # 单发：通过用户名查找用户
+            user = User.query.filter_by(username=target_username).first()
             if not user:
                 return jsonify({
                     'code': 404,
-                    'msg': '用户不存在'
+                    'msg': f'找不到用户: {target_username}'
                 }), 404
+            user_id = user.id
+        # 如果 target_username 为空，user_id 保持为 None，表示系统通知（群发）
         
         # 创建通知
         notification = Notification(
@@ -371,7 +376,7 @@ def send_notification():
             content=content,
             msg_type=msg_type,
             related_link=related_link,
-            user_id=user_id  # 如果为None，表示系统通知（群发）
+            user_id=user_id  # 如果为None，表示系统通知（群发，所有用户可见）
         )
         
         db.session.add(notification)
@@ -379,12 +384,13 @@ def send_notification():
         
         return jsonify({
             'code': 200,
-            'msg': '通知发送成功',
+            'msg': '消息已送达',
             'data': {
                 'notification_id': notification.id,
                 'title': notification.title,
                 'msg_type': notification.msg_type,
-                'user_id': notification.user_id
+                'user_id': notification.user_id,
+                'target_username': target_username if target_username else '全体用户'
             }
         }), 200
     
@@ -401,11 +407,11 @@ def get_notifications():
     """
     获取通知列表接口
     参数:
-        - user_id (可选): 用户ID，不传则返回系统通知
+        - user_id (可选): 用户ID，如果传入则返回该用户的个人通知 + 所有系统通知（全员广播）
         - is_read (可选): 是否已读筛选 (true/false)
         - limit (可选): 返回数量限制，默认20
         - offset (可选): 偏移量，默认0
-    返回: 通知列表
+    返回: 通知列表（包含个人通知和系统通知）
     """
     try:
         # 获取查询参数
@@ -414,15 +420,18 @@ def get_notifications():
         limit = request.args.get('limit', 20, type=int)
         offset = request.args.get('offset', 0, type=int)
         
-        # 构建查询
-        query = Notification.query
-        
-        # 用户ID筛选
+        # 构建查询：如果传了 user_id，同时获取个人通知和系统通知
         if user_id:
-            query = query.filter(Notification.user_id == user_id)
+            # 获取个人通知（user_id 匹配）或系统通知（user_id 为 NULL）
+            query = Notification.query.filter(
+                db.or_(
+                    Notification.user_id == user_id,
+                    Notification.user_id.is_(None)  # 系统通知（全员广播）
+                )
+            )
         else:
-            # 如果没有指定用户ID，返回系统通知（user_id为NULL）
-            query = query.filter(Notification.user_id.is_(None))
+            # 如果没有指定用户ID，只返回系统通知（user_id为NULL）
+            query = Notification.query.filter(Notification.user_id.is_(None))
         
         # 已读状态筛选
         if is_read is not None:
@@ -499,19 +508,26 @@ def mark_all_notifications_read():
     """
     标记所有通知为已读接口
     参数:
-        - user_id (可选): 用户ID，不传则标记系统通知
+        - user_id (可选): 用户ID，如果传入则标记该用户的个人通知和系统通知
     返回: 操作结果
     """
     try:
         # 获取查询参数
         user_id = request.args.get('user_id', type=int)
         
-        # 构建查询
+        # 构建查询：如果传了 user_id，同时标记个人通知和系统通知
         query = Notification.query.filter_by(is_read=False)
         
         if user_id:
-            query = query.filter(Notification.user_id == user_id)
+            # 标记个人未读通知（user_id 匹配）或系统未读通知（user_id 为 NULL）
+            query = query.filter(
+                db.or_(
+                    Notification.user_id == user_id,
+                    Notification.user_id.is_(None)  # 系统通知（全员广播）
+                )
+            )
         else:
+            # 如果没有指定用户ID，只标记系统通知
             query = query.filter(Notification.user_id.is_(None))
         
         # 批量更新
@@ -539,20 +555,27 @@ def get_unread_count():
     """
     获取未读通知数量接口
     参数:
-        - user_id (可选): 用户ID，不传则返回系统通知未读数
+        - user_id (可选): 用户ID，如果传入则返回该用户的个人未读通知 + 所有系统未读通知
     返回: 未读通知数量
     """
     try:
         # 获取查询参数
         user_id = request.args.get('user_id', type=int)
         
-        # 构建查询
-        query = Notification.query.filter_by(is_read=False)
-        
+        # 构建查询：如果传了 user_id，同时统计个人通知和系统通知
         if user_id:
-            query = query.filter(Notification.user_id == user_id)
+            # 统计个人未读通知（user_id 匹配）或系统未读通知（user_id 为 NULL）
+            query = Notification.query.filter_by(is_read=False).filter(
+                db.or_(
+                    Notification.user_id == user_id,
+                    Notification.user_id.is_(None)  # 系统通知（全员广播）
+                )
+            )
         else:
-            query = query.filter(Notification.user_id.is_(None))
+            # 如果没有指定用户ID，只统计系统通知未读数
+            query = Notification.query.filter_by(is_read=False).filter(
+                Notification.user_id.is_(None)
+            )
         
         count = query.count()
         

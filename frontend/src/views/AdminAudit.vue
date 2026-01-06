@@ -55,7 +55,7 @@ const notificationsLoading = ref(false)
 
 // 发布公告表单
 const sendNotificationForm = ref({
-  user_id: '',
+  target_username: '',
   title: '',
   msg_type: 'system',
   content: '',
@@ -264,12 +264,6 @@ const sendNotification = async () => {
     return
   }
   
-  // 如果填写了用户ID，验证是否为数字
-  if (sendNotificationForm.value.user_id && isNaN(parseInt(sendNotificationForm.value.user_id))) {
-    alert('用户ID必须是数字')
-    return
-  }
-  
   sendingNotification.value = true
   try {
     const payload = {
@@ -279,9 +273,9 @@ const sendNotification = async () => {
       related_link: sendNotificationForm.value.related_link.trim() || null
     }
     
-    // 如果填写了用户ID，添加到payload
-    if (sendNotificationForm.value.user_id.trim()) {
-      payload.user_id = parseInt(sendNotificationForm.value.user_id.trim())
+    // 如果填写了用户名，添加到payload（留空则群发）
+    if (sendNotificationForm.value.target_username.trim()) {
+      payload.target_username = sendNotificationForm.value.target_username.trim()
     }
     
     const response = await api.post('/admin/notifications/send', payload)
@@ -290,7 +284,7 @@ const sendNotification = async () => {
       alert('消息已送达')
       // 清空表单
       sendNotificationForm.value = {
-        user_id: '',
+        target_username: '',
         title: '',
         msg_type: 'system',
         content: '',
@@ -631,7 +625,10 @@ onUnmounted(() => {
         <div class="header-actions">
           <!-- 通知图标 -->
           <div class="notification-icon-wrapper" @click="toggleNotificationPanel">
-            <span class="notification-icon">🔔</span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
             <span v-if="unreadCount > 0" class="notification-badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
           </div>
           <button class="btn-logout" @click="handleLogout">退出登录</button>
@@ -692,13 +689,13 @@ onUnmounted(() => {
           <div class="send-notification-form">
             <div class="form-group">
               <label class="form-label">
-                接收用户ID
-                <span class="form-hint">（留空则发送给全体用户，目前仅支持单点发送）</span>
+                接收账号（用户名）
+                <span class="form-hint">（留空则发送给所有人）</span>
               </label>
               <input
                 type="text"
-                v-model="sendNotificationForm.user_id"
-                placeholder="留空表示系统通知（全体用户可见）"
+                v-model="sendNotificationForm.target_username"
+                placeholder="留空则发送给所有人 (输入用户名精确发送)"
                 class="form-input"
               />
             </div>
@@ -1192,9 +1189,9 @@ onUnmounted(() => {
   background-color: #f0f0f0;
 }
 
-.notification-icon {
-  font-size: 20px;
+.notification-icon-wrapper svg {
   display: block;
+  color: #666;
 }
 
 .notification-badge {

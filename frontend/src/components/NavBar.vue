@@ -3,7 +3,7 @@
  * 全局导航栏组件
  * 包含 Logo、搜索框、分类栏、用户信息和操作按钮
  */
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import api from '@/api'
 
@@ -26,6 +26,9 @@ const userId = ref(localStorage.getItem('user_id'))
 
 // 是否为管理员
 const isAdmin = ref(userRole.value === 'admin')
+
+// 未读消息数量
+const unreadMessageCount = ref(0)
 
 /**
  * 获取分类列表
@@ -110,6 +113,31 @@ const goToProfile = () => {
 }
 
 /**
+ * 跳转到消息中心
+ */
+const goToMessages = () => {
+  router.push('/messages')
+}
+
+/**
+ * 获取未读消息数量
+ */
+const fetchUnreadCount = async () => {
+  if (!userId.value) return
+  
+  try {
+    const response = await api.get('/admin/notifications/unread-count', {
+      params: { user_id: parseInt(userId.value) }
+    })
+    if (response.data.code === 200) {
+      unreadMessageCount.value = response.data.data?.unread_count || 0
+    }
+  } catch (err) {
+    console.error('获取未读消息数量失败:', err)
+  }
+}
+
+/**
  * 退出登录
  */
 const logout = () => {
@@ -119,9 +147,97 @@ const logout = () => {
   router.push('/login')
 }
 
-// 页面加载时获取分类
+// 定时器ID（用于清理）
+let unreadCountTimer = null
+
+// 页面加载时获取分类和未读消息数量
 onMounted(() => {
   fetchCategories()
+  if (userId.value) {
+    fetchUnreadCount()
+    // 定期刷新未读消息数量（每30秒）
+    unreadCountTimer = setInterval(fetchUnreadCount, 30000)
+  }
+  
+  // 监听页面可见性变化，当页面重新可见时刷新未读数量
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  
+  // 监听 localStorage 变化（用于检测登录/登出）
+  window.addEventListener('storage', handleStorageChange)
+  
+  // 使用轮询方式检查 userId 变化（因为同源页面 storage 事件可能不触发）
+  const checkUserIdInterval = setInterval(() => {
+    const currentUserId = localStorage.getItem('user_id')
+    if (currentUserId !== userId.value) {
+      userId.value = currentUserId
+      if (currentUserId) {
+        fetchUnreadCount()
+        if (!unreadCountTimer) {
+          unreadCountTimer = setInterval(fetchUnreadCount, 30000)
+        }
+      } else {
+        unreadMessageCount.value = 0
+        if (unreadCountTimer) {
+          clearInterval(unreadCountTimer)
+          unreadCountTimer = null
+        }
+      }
+    }
+  }, 1000) // 每秒检查一次
+  
+  // 保存检查定时器ID以便清理
+  window._userIdCheckInterval = checkUserIdInterval
+})
+
+// 处理 localStorage 变化
+const handleStorageChange = (e) => {
+  if (e.key === 'user_id') {
+    userId.value = e.newValue
+    if (e.newValue) {
+      fetchUnreadCount()
+      if (!unreadCountTimer) {
+        unreadCountTimer = setInterval(fetchUnreadCount, 30000)
+      }
+    } else {
+      unreadMessageCount.value = 0
+      if (unreadCountTimer) {
+        clearInterval(unreadCountTimer)
+        unreadCountTimer = null
+      }
+    }
+  }
+}
+
+// 处理页面可见性变化
+const handleVisibilityChange = () => {
+  if (document.visibilityState === 'visible' && userId.value) {
+    fetchUnreadCount()
+  }
+}
+
+// 监听路由变化，从消息中心返回时刷新未读数量
+watch(() => route.path, (newPath, oldPath) => {
+  // 如果从消息中心页面离开，刷新未读数量
+  if (oldPath === '/messages' && newPath !== '/messages' && userId.value) {
+    fetchUnreadCount()
+  }
+  // 每次路由变化时都刷新一次（确保数据最新）
+  if (userId.value && newPath !== '/messages') {
+    fetchUnreadCount()
+  }
+})
+
+// 组件卸载时清理定时器和事件监听
+onUnmounted(() => {
+  if (unreadCountTimer) {
+    clearInterval(unreadCountTimer)
+  }
+  if (window._userIdCheckInterval) {
+    clearInterval(window._userIdCheckInterval)
+    delete window._userIdCheckInterval
+  }
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  window.removeEventListener('storage', handleStorageChange)
 })
 </script>
 
@@ -160,6 +276,22 @@ onMounted(() => {
 
       <!-- 右侧：用户信息和操作按钮 -->
       <div class="user-section">
+        <!-- 消息按钮（仅登录用户显示） -->
+        <button 
+          v-if="userId" 
+          class="message-btn" 
+          @click="goToMessages"
+          title="消息中心"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+          <span v-if="unreadMessageCount > 0" class="message-badge">
+            {{ unreadMessageCount > 99 ? '99+' : unreadMessageCount }}
+          </span>
+        </button>
+
         <!-- 上传按钮 -->
         <button class="upload-btn" @click="goToUpload">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -186,6 +318,12 @@ onMounted(() => {
             <div class="dropdown-divider"></div>
             <button class="dropdown-item" @click="goToProfile">
               <span>个人主页</span>
+            </button>
+            <button class="dropdown-item" @click="goToMessages">
+              <span>消息中心</span>
+              <span v-if="unreadMessageCount > 0" class="dropdown-badge">
+                {{ unreadMessageCount > 99 ? '99+' : unreadMessageCount }}
+              </span>
             </button>
             <button v-if="isAdmin" class="dropdown-item" @click="goToAdmin">
               <span>管理后台</span>
@@ -291,8 +429,8 @@ onMounted(() => {
 .dynamic-search-box.focus {
   width: 500px;
   background: #fff;
-  border-color: #FF5252;
-  box-shadow: 0 4px 12px rgba(255, 82, 82, 0.15);
+  border-color: transparent;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .dynamic-search-box .search-input {
@@ -303,6 +441,12 @@ onMounted(() => {
   font-size: 14px;
   color: #333;
   padding: 0;
+}
+
+.dynamic-search-box .search-input:focus {
+  outline: none;
+  border: none;
+  box-shadow: none;
 }
 
 .dynamic-search-box .search-input::placeholder {
@@ -338,6 +482,44 @@ onMounted(() => {
   align-items: center;
   gap: 16px;
   flex-shrink: 0;
+}
+
+/* 消息按钮 */
+.message-btn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  padding: 0;
+}
+
+.message-btn:hover {
+  background: rgba(255, 82, 82, 0.1);
+  color: #FF5252;
+}
+
+.message-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: #ff4d4f;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+  line-height: 1.2;
+  box-shadow: 0 2px 4px rgba(255, 77, 79, 0.3);
 }
 
 /* 上传按钮 */
@@ -430,7 +612,20 @@ onMounted(() => {
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
+}
+
+.dropdown-badge {
+  background: #ff4d4f;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+  line-height: 1.2;
 }
 
 .dropdown-item:hover {
