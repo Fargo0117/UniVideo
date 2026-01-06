@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `nickname` VARCHAR(50) NOT NULL COMMENT '昵称',
   `role` VARCHAR(20) NOT NULL DEFAULT 'user' COMMENT '角色: user/admin',
   `avatar` VARCHAR(255) DEFAULT '' COMMENT '头像路径',
+  `status` TINYINT NOT NULL DEFAULT 1 COMMENT '用户状态: 0=封禁/停用, 1=正常',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '注册时间'
 ) COMMENT='用户信息表';
 

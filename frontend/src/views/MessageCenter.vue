@@ -110,8 +110,8 @@ const getMessageConfig = (notification) => {
     } else {
       return {
         icon: '❌',
-        iconBg: '#ff4d4f',
-        titleColor: '#ff4d4f',
+        iconBg: '#FF5252',
+        titleColor: '#FF5252',
         titleText: '审核驳回',
         iconClass: 'icon-error'
       }
@@ -122,7 +122,7 @@ const getMessageConfig = (notification) => {
   if (msg_type === 'system') {
     return {
       icon: '📢',
-      iconBg: '#1890ff',
+      iconBg: '#00AEEC',
       titleColor: '#262626',
       titleText: '系统公告',
       iconClass: 'icon-system'
@@ -449,6 +449,19 @@ onMounted(() => {
   font-size: 24px;
   font-weight: 600;
   color: #262626;
+  position: relative;
+  padding-bottom: 12px;
+}
+
+.page-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 60px;
+  height: 3px;
+  background: linear-gradient(90deg, #FF5252, #FF7676);
+  border-radius: 2px;
 }
 
 .header-actions {
@@ -459,7 +472,7 @@ onMounted(() => {
 
 .unread-badge {
   padding: 4px 12px;
-  background: #ff4d4f;
+  background: #FF5252;
   color: #fff;
   border-radius: 12px;
   font-size: 13px;
@@ -468,7 +481,7 @@ onMounted(() => {
 
 .btn-mark-all-read {
   padding: 6px 16px;
-  background: #1890ff;
+  background: #FF5252;
   color: #fff;
   border: none;
   border-radius: 4px;
@@ -478,7 +491,9 @@ onMounted(() => {
 }
 
 .btn-mark-all-read:hover {
-  background: #40a9ff;
+  background: #FF7676;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(255, 82, 82, 0.3);
 }
 
 /* ==================== 筛选栏 ==================== */
@@ -509,7 +524,7 @@ onMounted(() => {
 }
 
 .filter-btn.active {
-  background: #1890ff;
+  background: #FF5252;
   color: #fff;
 }
 
@@ -550,11 +565,11 @@ onMounted(() => {
 }
 
 .message-card.unread {
-  background: #f9f9f9;
+  background: rgba(255, 82, 82, 0.03);
 }
 
 .message-card.unread:hover {
-  background: #f0f0f0;
+  background: rgba(255, 82, 82, 0.06);
 }
 
 .message-card.has-link {
@@ -632,7 +647,7 @@ onMounted(() => {
   padding: 0;
   background: none;
   border: none;
-  color: #1890ff;
+  color: #FF5252;
   font-size: 14px;
   cursor: pointer;
   text-decoration: underline;
@@ -640,7 +655,7 @@ onMounted(() => {
 
 .btn-expand:hover,
 .btn-collapse:hover {
-  color: #40a9ff;
+  color: #FF7676;
 }
 
 .message-link {
@@ -649,13 +664,13 @@ onMounted(() => {
 
 .link-text {
   font-size: 13px;
-  color: #1890ff;
+  color: #FF5252;
   cursor: pointer;
   transition: color 0.2s;
 }
 
 .link-text:hover {
-  color: #40a9ff;
+  color: #FF7676;
   text-decoration: underline;
 }
 
@@ -670,7 +685,7 @@ onMounted(() => {
 .unread-dot {
   width: 8px;
   height: 8px;
-  background: #ff4d4f;
+  background: #FF5252;
   border-radius: 50%;
   flex-shrink: 0;
 }

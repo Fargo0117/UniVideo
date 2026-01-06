@@ -452,28 +452,28 @@ onMounted(() => {
             :class="{ active: activeTab === 'videos' }"
             @click="switchTab('videos')"
           >
-            我的投稿 ({{ myVideos.length }})
+            我的投稿 <span class="tab-count">{{ myVideos.length }}</span>
           </button>
           <button 
             class="tab-btn" 
             :class="{ active: activeTab === 'collections' }"
             @click="switchTab('collections')"
           >
-            我的收藏 ({{ myCollections.length }})
+            我的收藏 <span class="tab-count">{{ myCollections.length }}</span>
           </button>
           <button 
             class="tab-btn" 
             :class="{ active: activeTab === 'following' }"
             @click="switchTab('following')"
           >
-            我的关注 ({{ myFollowing.length }})
+            我的关注 <span class="tab-count">{{ myFollowing.length }}</span>
           </button>
           <button 
             class="tab-btn" 
             :class="{ active: activeTab === 'followers' }"
             @click="switchTab('followers')"
           >
-            我的粉丝 ({{ myFollowers.length }})
+            我的粉丝 <span class="tab-count">{{ myFollowers.length }}</span>
           </button>
         </div>
 
@@ -742,6 +742,7 @@ onMounted(() => {
   border-radius: 50%;
   object-fit: cover;
   border: 3px solid #f0f0f0;
+  box-shadow: 0 0 0 2px rgba(255, 82, 82, 0.1);
 }
 
 .user-info {
@@ -796,19 +797,24 @@ onMounted(() => {
 }
 
 .tab-btn:hover {
-  color: #409eff;
+  color: #FF7676;
   background: #f9f9f9;
 }
 
 .tab-btn.active {
-  color: #409eff;
+  color: #FF5252;
   font-weight: 500;
-  border-bottom-color: #409eff;
+  border-bottom: 2px solid #FF5252;
 }
 
 .tab-content {
   padding: 24px;
   min-height: 300px;
+}
+
+.tab-count {
+  color: #FF5252;
+  font-weight: 600;
 }
 
 /* ==================== 视频网格 ==================== */
@@ -969,7 +975,7 @@ onMounted(() => {
 
 .btn-follow {
   padding: 8px 20px;
-  background: #409eff;
+  background: #FF5252;
   color: #fff;
   border: none;
   border-radius: 20px;
@@ -981,9 +987,9 @@ onMounted(() => {
 }
 
 .btn-follow:hover {
-  background: #66b1ff;
+  background: #FF7676;
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+  box-shadow: 0 2px 8px rgba(255, 82, 82, 0.3);
 }
 
 .btn-follow.following {
@@ -1006,26 +1012,33 @@ onMounted(() => {
 }
 
 .btn-primary {
-  background-color: #409eff;
+  background-color: #FF5252;
   color: #fff;
+  border-radius: 6px;
 }
 
 .btn-primary:hover {
-  background-color: #66b1ff;
+  background-color: #FF7676;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 82, 82, 0.3);
 }
 
 .btn-primary:disabled {
-  background-color: #a0cfff;
+  background-color: rgba(255, 82, 82, 0.5);
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .btn-secondary {
-  background-color: #f5f5f5;
-  color: #666;
+  background-color: transparent;
+  color: #FF5252;
+  border: 1px solid #FF5252;
+  border-radius: 6px;
 }
 
 .btn-secondary:hover {
-  background-color: #e8e8e8;
+  background-color: rgba(255, 82, 82, 0.1);
 }
 
 /* ==================== 弹窗样式 ==================== */
@@ -1105,7 +1118,8 @@ onMounted(() => {
 
 .form-group input:focus {
   outline: none;
-  border-color: #409eff;
+  border-color: #FF5252;
+  box-shadow: 0 0 0 2px rgba(255, 82, 82, 0.1);
 }
 
 /* 头像上传 */

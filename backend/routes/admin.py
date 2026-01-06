@@ -3,6 +3,7 @@
 提供视频审核、管理等功能API接口
 """
 from flask import Blueprint, request, jsonify, current_app
+from functools import wraps
 from models import db, Video, User, Notification
 from datetime import datetime, timedelta
 import os
@@ -10,6 +11,53 @@ import json
 
 # 创建管理员蓝图
 admin_bp = Blueprint('admin', __name__)
+
+
+def admin_required(f):
+    """
+    管理员权限验证装饰器
+    从请求头 X-User-ID 获取用户ID，验证是否为管理员
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        try:
+            # 从请求头获取用户ID
+            user_id = request.headers.get('X-User-ID')
+            if not user_id:
+                return jsonify({
+                    'code': 401,
+                    'msg': '未授权：缺少用户ID'
+                }), 401
+            
+            # 查询用户
+            user = User.query.get(int(user_id))
+            if not user:
+                return jsonify({
+                    'code': 401,
+                    'msg': '未授权：用户不存在'
+                }), 401
+            
+            # 验证是否为管理员
+            if not user.is_admin():
+                return jsonify({
+                    'code': 403,
+                    'msg': '权限不足：仅管理员可访问'
+                }), 403
+            
+            # 将用户对象传递给被装饰的函数
+            return f(*args, **kwargs)
+        except (ValueError, TypeError):
+            return jsonify({
+                'code': 400,
+                'msg': '无效的用户ID'
+            }), 400
+        except Exception as e:
+            return jsonify({
+                'code': 500,
+                'msg': f'服务器错误: {str(e)}'
+            }), 500
+    
+    return decorated_function
 
 
 @admin_bp.route('/stats', methods=['GET'])
@@ -588,6 +636,133 @@ def get_unread_count():
         }), 200
     
     except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': f'服务器错误: {str(e)}'
+        }), 500
+
+
+@admin_bp.route('/users', methods=['GET'])
+@admin_required
+def get_users():
+    """
+    获取用户列表接口
+    参数:
+        - page (可选): 页码，默认1
+        - per_page (可选): 每页数量，默认10
+        - keyword (可选): 搜索关键词（用户名模糊搜索）
+    返回: 用户列表和分页信息
+    """
+    try:
+        # 获取查询参数
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        keyword = request.args.get('keyword', '').strip()
+        
+        # 限制每页数量范围
+        if per_page < 1 or per_page > 100:
+            per_page = 10
+        
+        # 构建查询
+        query = User.query
+        
+        # 关键词搜索（用户名模糊匹配）
+        if keyword:
+            query = query.filter(User.username.like(f'%{keyword}%'))
+        
+        # 按创建时间倒序排列
+        query = query.order_by(User.created_at.desc())
+        
+        # 分页查询
+        pagination = query.paginate(
+            page=page,
+            per_page=per_page,
+            error_out=False
+        )
+        
+        # 转换为字典列表
+        user_list = [user.to_dict() for user in pagination.items]
+        
+        return jsonify({
+            'code': 200,
+            'msg': '获取成功',
+            'data': {
+                'list': user_list,
+                'total': pagination.total,
+                'page': page,
+                'per_page': per_page,
+                'pages': pagination.pages
+            }
+        }), 200
+    
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': f'服务器错误: {str(e)}'
+        }), 500
+
+
+@admin_bp.route('/users/<int:user_id>/status', methods=['POST'])
+@admin_required
+def update_user_status(user_id):
+    """
+    更新用户状态接口
+    参数:
+        - user_id: 用户ID（路径参数）
+        - status: 用户状态（JSON body），1=正常, 0=封禁/停用
+    返回: 操作结果
+    """
+    try:
+        # 获取请求数据
+        data = request.get_json()
+        
+        # 验证必填字段
+        if not data or 'status' not in data:
+            return jsonify({
+                'code': 400,
+                'msg': '缺少必填字段：status'
+            }), 400
+        
+        status = data.get('status')
+        
+        # 验证状态值
+        if status not in [0, 1]:
+            return jsonify({
+                'code': 400,
+                'msg': 'status 参数无效，仅支持 0（封禁）或 1（正常）'
+            }), 400
+        
+        # 查询用户
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({
+                'code': 404,
+                'msg': '用户不存在'
+            }), 404
+        
+        # 不能封禁管理员
+        if user.is_admin() and status == 0:
+            return jsonify({
+                'code': 403,
+                'msg': '不能封禁管理员账号'
+            }), 403
+        
+        # 更新状态
+        user.status = status
+        db.session.commit()
+        
+        return jsonify({
+            'code': 200,
+            'msg': '操作成功',
+            'data': {
+                'user_id': user.id,
+                'username': user.username,
+                'status': user.status
+            }
+        }), 200
+    
+    except Exception as e:
+        db.session.rollback()
         return jsonify({
             'code': 500,
             'msg': f'服务器错误: {str(e)}'

@@ -37,31 +37,7 @@ const artPlayerInstance = ref(null)
 const operatingId = ref(null)
 const auditLoading = ref(false)
 
-// 当前激活的菜单项
-const activeMenu = ref('dashboard')
-
-// 统计数据
-const stats = ref({
-  pendingVideos: 0,
-  totalUsers: 0,
-  todayNew: 0
-})
-
-// 通知相关
-const notifications = ref([])
-const unreadCount = ref(0)
-const showNotificationPanel = ref(false)
-const notificationsLoading = ref(false)
-
-// 发布公告表单
-const sendNotificationForm = ref({
-  target_username: '',
-  title: '',
-  msg_type: 'system',
-  content: '',
-  related_link: ''
-})
-const sendingNotification = ref(false)
+// 已移除：统计数据、通知相关、发布公告表单（已迁移到其他页面）
 
 // 状态选项
 const statusOptions = [
@@ -80,12 +56,7 @@ const statusMap = {
 
 // ==================== 计算属性 ====================
 
-/**
- * 计算待审核视频数量
- */
-const pendingVideosCount = computed(() => {
-  return videos.value.filter(v => v.status === 0).length
-})
+// 已移除：pendingVideosCount 计算属性（已迁移到 Dashboard）
 
 // ==================== 工具函数 ====================
 
@@ -123,24 +94,6 @@ const getStatusInfo = (status) => {
 // ==================== API 调用 ====================
 
 /**
- * 获取统计数据
- */
-const fetchStats = async () => {
-  try {
-    const response = await api.get('/admin/stats')
-    if (response.data.code === 200) {
-      stats.value = {
-        pendingVideos: response.data.data.pending_videos || 0,
-        totalUsers: response.data.data.total_users || 0,
-        todayNew: response.data.data.today_new || 0
-      }
-    }
-  } catch (err) {
-    console.error('获取统计数据失败:', err)
-  }
-}
-
-/**
  * 获取视频列表（支持搜索和筛选）
  */
 const fetchVideoList = async () => {
@@ -157,8 +110,6 @@ const fetchVideoList = async () => {
     
     const response = await api.get('/admin/manage/list', { params })
     videos.value = response.data.data?.list || []
-    // 更新统计数据
-    await fetchStats()
   } catch (err) {
     console.error('获取视频列表失败:', err)
     const message = err.response?.data?.msg || '获取视频列表失败'
@@ -166,138 +117,6 @@ const fetchVideoList = async () => {
     videos.value = []
   } finally {
     loading.value = false
-  }
-}
-
-/**
- * 获取通知列表
- */
-const fetchNotifications = async () => {
-  notificationsLoading.value = true
-  try {
-    const response = await api.get('/admin/notifications', {
-      params: {
-        limit: 20,
-        offset: 0
-      }
-    })
-    if (response.data.code === 200) {
-      notifications.value = response.data.data?.list || []
-    }
-  } catch (err) {
-    console.error('获取通知列表失败:', err)
-    notifications.value = []
-  } finally {
-    notificationsLoading.value = false
-  }
-}
-
-/**
- * 获取未读通知数量
- */
-const fetchUnreadCount = async () => {
-  try {
-    const response = await api.get('/admin/notifications/unread-count')
-    if (response.data.code === 200) {
-      unreadCount.value = response.data.data?.unread_count || 0
-    }
-  } catch (err) {
-    console.error('获取未读通知数量失败:', err)
-  }
-}
-
-/**
- * 标记通知为已读
- */
-const markAsRead = async (notificationId) => {
-  try {
-    await api.put(`/admin/notifications/${notificationId}/read`)
-    // 更新本地状态
-    const notification = notifications.value.find(n => n.id === notificationId)
-    if (notification) {
-      notification.is_read = true
-    }
-    await fetchUnreadCount()
-  } catch (err) {
-    console.error('标记通知已读失败:', err)
-  }
-}
-
-/**
- * 标记所有通知为已读
- */
-const markAllAsRead = async () => {
-  try {
-    await api.put('/admin/notifications/read-all')
-    // 更新本地状态
-    notifications.value.forEach(n => {
-      n.is_read = true
-    })
-    unreadCount.value = 0
-  } catch (err) {
-    console.error('标记所有通知已读失败:', err)
-  }
-}
-
-/**
- * 切换通知面板
- */
-const toggleNotificationPanel = () => {
-  showNotificationPanel.value = !showNotificationPanel.value
-  if (showNotificationPanel.value) {
-    fetchNotifications()
-  }
-}
-
-/**
- * 发送通知
- */
-const sendNotification = async () => {
-  // 验证必填字段
-  if (!sendNotificationForm.value.title.trim()) {
-    alert('请输入消息标题')
-    return
-  }
-  
-  if (!sendNotificationForm.value.content.trim()) {
-    alert('请输入消息内容')
-    return
-  }
-  
-  sendingNotification.value = true
-  try {
-    const payload = {
-      title: sendNotificationForm.value.title.trim(),
-      content: sendNotificationForm.value.content.trim(),
-      msg_type: sendNotificationForm.value.msg_type,
-      related_link: sendNotificationForm.value.related_link.trim() || null
-    }
-    
-    // 如果填写了用户名，添加到payload（留空则群发）
-    if (sendNotificationForm.value.target_username.trim()) {
-      payload.target_username = sendNotificationForm.value.target_username.trim()
-    }
-    
-    const response = await api.post('/admin/notifications/send', payload)
-    
-    if (response.data.code === 200) {
-      alert('消息已送达')
-      // 清空表单
-      sendNotificationForm.value = {
-        target_username: '',
-        title: '',
-        msg_type: 'system',
-        content: '',
-        related_link: ''
-      }
-    } else {
-      alert(response.data.msg || '发送失败')
-    }
-  } catch (err) {
-    const message = err.response?.data?.msg || '发送失败'
-    alert(message)
-  } finally {
-    sendingNotification.value = false
   }
 }
 
@@ -517,30 +336,7 @@ const closePreview = () => {
 }
 
 
-/**
- * 退出登录
- */
-const handleLogout = () => {
-  if (confirm('确定要退出登录吗？')) {
-    localStorage.clear()
-    router.push('/login')
-  }
-}
-
-/**
- * 切换菜单
- */
-const switchMenu = (menu) => {
-  activeMenu.value = menu
-  // 后续可以在这里添加路由跳转逻辑
-}
-
 // ==================== 生命周期 ====================
-
-// 监听视频列表变化，更新统计数据
-watch(() => videos.value, () => {
-  stats.value.pendingVideos = pendingVideosCount.value
-}, { immediate: true })
 
 onMounted(() => {
   // 检查是否为管理员
@@ -551,13 +347,6 @@ onMounted(() => {
     return
   }
   fetchVideoList()
-  fetchStats()
-  fetchUnreadCount()
-  
-  // 定期刷新未读通知数量
-  setInterval(() => {
-    fetchUnreadCount()
-  }, 30000) // 每30秒刷新一次
 })
 
 onUnmounted(() => {
@@ -566,234 +355,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="admin-layout">
-    <!-- 左侧边栏 -->
-    <aside class="sidebar">
-      <div class="sidebar-header">
-        <h2 class="logo">UniVideo</h2>
-        <p class="logo-subtitle">管理后台</p>
-      </div>
-      <nav class="sidebar-nav">
-        <div 
-          class="nav-item" 
-          :class="{ active: activeMenu === 'dashboard' }"
-          @click="switchMenu('dashboard')"
-        >
-          <span class="nav-icon">📊</span>
-          <span class="nav-text">仪表盘</span>
-        </div>
-        <div 
-          class="nav-item" 
-          :class="{ active: activeMenu === 'audit' }"
-          @click="switchMenu('audit')"
-        >
-          <span class="nav-icon">🎬</span>
-          <span class="nav-text">内容审核</span>
-        </div>
-        <div 
-          class="nav-item" 
-          :class="{ active: activeMenu === 'users' }"
-          @click="switchMenu('users')"
-        >
-          <span class="nav-icon">👥</span>
-          <span class="nav-text">用户管理</span>
-        </div>
-        <div 
-          class="nav-item" 
-          :class="{ active: activeMenu === 'notifications' }"
-          @click="switchMenu('notifications')"
-        >
-          <span class="nav-icon">📢</span>
-          <span class="nav-text">通知管理</span>
-        </div>
-        <div 
-          class="nav-item" 
-          :class="{ active: activeMenu === 'settings' }"
-          @click="switchMenu('settings')"
-        >
-          <span class="nav-icon">⚙️</span>
-          <span class="nav-text">系统设置</span>
-        </div>
-      </nav>
-    </aside>
-
-    <!-- 右侧主内容区 -->
-    <div class="main-content">
-      <!-- 顶部栏 -->
-      <header class="top-header">
-        <h1 class="page-title">管理员控制台</h1>
-        <div class="header-actions">
-          <!-- 通知图标 -->
-          <div class="notification-icon-wrapper" @click="toggleNotificationPanel">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-            </svg>
-            <span v-if="unreadCount > 0" class="notification-badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
-          </div>
-          <button class="btn-logout" @click="handleLogout">退出登录</button>
-        </div>
-      </header>
-
-      <!-- 通知面板 -->
-      <div v-if="showNotificationPanel" class="notification-panel">
-        <div class="notification-panel-header">
-          <h3>通知中心</h3>
-          <div class="notification-actions">
-            <button class="btn-mark-all-read" @click="markAllAsRead" v-if="unreadCount > 0">
-              全部已读
-            </button>
-            <button class="btn-close-panel" @click="showNotificationPanel = false">×</button>
-          </div>
-        </div>
-        <div class="notification-panel-body">
-          <div v-if="notificationsLoading" class="notifications-loading">
-            <p>加载中...</p>
-          </div>
-          <div v-else-if="notifications.length === 0" class="notifications-empty">
-            <p>暂无通知</p>
-          </div>
-          <div v-else class="notifications-list">
-            <div 
-              v-for="notification in notifications" 
-              :key="notification.id"
-              class="notification-item"
-              :class="{ 'unread': !notification.is_read }"
-              @click="markAsRead(notification.id)"
-            >
-              <div class="notification-icon-small">
-                <span v-if="notification.msg_type === 'audit'">📋</span>
-                <span v-else-if="notification.msg_type === 'interaction'">💬</span>
-                <span v-else>📢</span>
-              </div>
-              <div class="notification-content">
-                <div class="notification-title">{{ notification.title }}</div>
-                <div class="notification-text">{{ notification.content }}</div>
-                <div class="notification-time">{{ formatTime(notification.created_at) }}</div>
-              </div>
-              <div v-if="!notification.is_read" class="notification-dot"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 内容区域 -->
-      <main class="content-area">
-        <!-- 通知管理面板 -->
-        <div v-if="activeMenu === 'notifications'" class="notification-management">
-          <div class="management-header">
-            <h2 class="management-title">发布公告</h2>
-            <p class="management-desc">向指定用户或全体用户发送系统通知</p>
-          </div>
-
-          <div class="send-notification-form">
-            <div class="form-group">
-              <label class="form-label">
-                接收账号（用户名）
-                <span class="form-hint">（留空则发送给所有人）</span>
-              </label>
-              <input
-                type="text"
-                v-model="sendNotificationForm.target_username"
-                placeholder="留空则发送给所有人 (输入用户名精确发送)"
-                class="form-input"
-              />
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">
-                标题 <span class="required">*</span>
-              </label>
-              <input
-                type="text"
-                v-model="sendNotificationForm.title"
-                placeholder="请输入消息标题"
-                class="form-input"
-                required
-              />
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">
-                类型 <span class="required">*</span>
-              </label>
-              <select
-                v-model="sendNotificationForm.msg_type"
-                class="form-select"
-              >
-                <option value="system">系统通知</option>
-                <option value="audit">审核通知</option>
-                <option value="interaction">互动通知</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">
-                内容 <span class="required">*</span>
-              </label>
-              <textarea
-                v-model="sendNotificationForm.content"
-                placeholder="请输入消息内容"
-                rows="6"
-                class="form-textarea"
-                required
-              ></textarea>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">
-                关联链接
-                <span class="form-hint">（可选，用户点击消息时跳转的链接，如：/video/123）</span>
-              </label>
-              <input
-                type="text"
-                v-model="sendNotificationForm.related_link"
-                placeholder="例如：/video/123 或 /upload"
-                class="form-input"
-              />
-            </div>
-
-            <div class="form-actions">
-              <button
-                class="btn-send"
-                :disabled="sendingNotification || !sendNotificationForm.title.trim() || !sendNotificationForm.content.trim()"
-                @click="sendNotification"
-              >
-                {{ sendingNotification ? '发送中...' : '发送通知' }}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- 仪表盘和审核列表（默认显示） -->
-        <template v-else>
-          <!-- 统计卡片 -->
-          <div class="stats-cards">
-          <div class="stat-card">
-            <div class="stat-icon">🕒</div>
-            <div class="stat-content">
-              <div class="stat-value">{{ stats.pendingVideos }}</div>
-              <div class="stat-label">待审核视频</div>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon">👥</div>
-            <div class="stat-content">
-              <div class="stat-value">{{ stats.totalUsers }}</div>
-              <div class="stat-label">总用户数</div>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon">📈</div>
-            <div class="stat-content">
-              <div class="stat-value">{{ stats.todayNew }}</div>
-              <div class="stat-label">今日新增</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 审核列表容器 -->
-        <div class="audit-container">
+  <div class="audit-page">
+    <!-- 审核列表容器 -->
+    <div class="audit-container">
           <div class="audit-header">
             <h2 class="audit-title">待处理任务</h2>
           </div>
@@ -913,9 +477,6 @@ onUnmounted(() => {
               </tbody>
             </table>
           </div>
-        </div>
-        </template>
-      </main>
     </div>
 
     <!-- 审核弹窗 -->
@@ -1064,379 +625,24 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* ==================== 全局布局 ==================== */
-.admin-layout {
-  display: flex;
-  min-height: 100vh;
-  background-color: #f0f2f5;
-}
-
-/* ==================== 左侧边栏 ==================== */
-.sidebar {
-  width: 240px;
-  background-color: #001529;
+/* ==================== 审核页面 ==================== */
+.audit-page {
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  position: fixed;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
 }
 
-.sidebar-header {
-  padding: 24px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.logo {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: #fff;
-  margin-bottom: 4px;
-}
-
-.logo-subtitle {
-  margin: 0;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.65);
-}
-
-.sidebar-nav {
-  flex: 1;
-  padding: 16px 0;
-  overflow-y: auto;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  padding: 12px 20px;
-  color: rgba(255, 255, 255, 0.65);
-  cursor: pointer;
-  transition: all 0.3s;
-  border-left: 3px solid transparent;
-}
-
-.nav-item:hover {
-  background-color: rgba(255, 255, 255, 0.08);
-  color: #fff;
-}
-
-.nav-item.active {
-  background-color: rgba(24, 144, 255, 0.15);
-  color: #1890ff;
-  border-left-color: #1890ff;
-}
-
-.nav-icon {
-  font-size: 18px;
-  margin-right: 12px;
-  width: 20px;
-  text-align: center;
-}
-
-.nav-text {
-  font-size: 14px;
-}
-
-/* ==================== 右侧主内容区 ==================== */
-.main-content {
-  flex: 1;
-  margin-left: 240px;
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-}
-
-/* 顶部栏 */
-.top-header {
-  background: #fff;
-  padding: 16px 24px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: #262626;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-/* 通知图标 */
-.notification-icon-wrapper {
-  position: relative;
-  cursor: pointer;
-  padding: 8px;
-  border-radius: 4px;
-  transition: background-color 0.3s;
-}
-
-.notification-icon-wrapper:hover {
-  background-color: #f0f0f0;
-}
-
-.notification-icon-wrapper svg {
-  display: block;
-  color: #666;
-}
-
-.notification-badge {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  background: #ff4d4f;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 10px;
-  min-width: 18px;
-  text-align: center;
-  line-height: 1.2;
-}
-
-.btn-logout {
-  padding: 6px 16px;
-  background: #ff4d4f;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.btn-logout:hover {
-  background: #ff7875;
-}
-
-/* 通知面板 */
-.notification-panel {
-  position: fixed;
-  top: 60px;
-  right: 24px;
-  width: 400px;
-  max-height: 600px;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-  z-index: 1500;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.notification-panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid #f0f0f0;
-  background: #fafafa;
-}
-
-.notification-panel-header h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #262626;
-}
-
-.notification-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.btn-mark-all-read {
-  padding: 4px 12px;
-  background: #1890ff;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.btn-mark-all-read:hover {
-  background: #40a9ff;
-}
-
-.btn-close-panel {
-  background: none;
-  border: none;
-  font-size: 24px;
-  color: #8c8c8c;
-  cursor: pointer;
-  line-height: 1;
-  padding: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btn-close-panel:hover {
-  color: #262626;
-}
-
-.notification-panel-body {
-  flex: 1;
-  overflow-y: auto;
-  max-height: 500px;
-}
-
-.notifications-loading,
-.notifications-empty {
-  text-align: center;
-  padding: 40px 20px;
-  color: #8c8c8c;
-  font-size: 14px;
-}
-
-.notifications-list {
-  padding: 8px 0;
-}
-
-.notification-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px 20px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  border-bottom: 1px solid #f0f0f0;
-  position: relative;
-}
-
-.notification-item:hover {
-  background-color: #fafafa;
-}
-
-.notification-item.unread {
-  background-color: #f0f7ff;
-}
-
-.notification-item.unread:hover {
-  background-color: #e6f4ff;
-}
-
-.notification-icon-small {
-  font-size: 20px;
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
-.notification-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.notification-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #262626;
-  margin-bottom: 4px;
-}
-
-.notification-text {
-  font-size: 13px;
-  color: #595959;
-  line-height: 1.5;
-  margin-bottom: 6px;
-  word-break: break-word;
-}
-
-.notification-time {
-  font-size: 12px;
-  color: #8c8c8c;
-}
-
-.notification-dot {
-  position: absolute;
-  top: 16px;
-  right: 12px;
-  width: 8px;
-  height: 8px;
-  background: #1890ff;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-/* 内容区域 */
-.content-area {
-  flex: 1;
-  padding: 24px;
-  overflow-y: auto;
-}
-
-/* ==================== 统计卡片 ==================== */
-.stats-cards {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
-  margin-bottom: 24px;
-}
-
-.stat-card {
-  background: #fff;
-  border-radius: 8px;
-  padding: 24px;
-  display: flex;
-  align-items: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s;
-}
-
-.stat-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-  transform: translateY(-2px);
-}
-
-.stat-icon {
-  font-size: 48px;
-  margin-right: 20px;
-}
-
-.stat-content {
-  flex: 1;
-}
-
-.stat-value {
-  font-size: 32px;
-  font-weight: 600;
-  color: #262626;
-  line-height: 1.2;
-  margin-bottom: 8px;
-}
-
-.stat-label {
-  font-size: 14px;
-  color: #8c8c8c;
-}
-
-/* ==================== 审核列表容器 ==================== */
+/* ==================== 审核容器 ==================== */
 .audit-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   background: #fff;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   overflow: hidden;
+  min-height: 0; /* 允许 flex 子元素收缩 */
 }
 
 .audit-header {
@@ -1514,7 +720,9 @@ onUnmounted(() => {
 
 /* ==================== 表格样式 ==================== */
 .audit-table-wrapper {
-  overflow-x: auto;
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
 }
 
 .audit-table {
@@ -2017,139 +1225,10 @@ onUnmounted(() => {
   border-top: 1px solid #f0f0f0;
 }
 
-/* ==================== 通知管理面板样式 ==================== */
-.notification-management {
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  overflow: hidden;
-}
-
-.management-header {
-  padding: 24px;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.management-title {
-  margin: 0 0 8px 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: #262626;
-}
-
-.management-desc {
-  margin: 0;
-  font-size: 14px;
-  color: #8c8c8c;
-}
-
-.send-notification-form {
-  padding: 24px;
-}
-
-.form-group {
-  margin-bottom: 20px;
-}
-
-.form-group:last-child {
-  margin-bottom: 0;
-}
-
-.form-label {
-  display: block;
-  font-size: 14px;
-  font-weight: 500;
-  color: #262626;
-  margin-bottom: 8px;
-}
-
-.form-hint {
-  font-size: 12px;
-  color: #8c8c8c;
-  font-weight: normal;
-}
-
-.required {
-  color: #ff4d4f;
-}
-
-.form-input,
-.form-select,
-.form-textarea {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #d9d9d9;
-  border-radius: 4px;
-  font-size: 14px;
-  font-family: inherit;
-  box-sizing: border-box;
-  transition: all 0.3s;
-}
-
-.form-input:focus,
-.form-select:focus,
-.form-textarea:focus {
-  outline: none;
-  border-color: #1890ff;
-  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
-}
-
-.form-input::placeholder,
-.form-textarea::placeholder {
-  color: #bfbfbf;
-}
-
-.form-textarea {
-  resize: vertical;
-  min-height: 120px;
-  line-height: 1.6;
-}
-
-.form-select {
-  cursor: pointer;
-  background: #fff;
-}
-
-.form-actions {
-  margin-top: 32px;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.btn-send {
-  padding: 10px 24px;
-  background: #1890ff;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s;
-  min-width: 120px;
-}
-
-.btn-send:hover:not(:disabled) {
-  background: #40a9ff;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
-}
-
-.btn-send:disabled {
-  background: #d9d9d9;
-  color: #fff;
-  cursor: not-allowed;
-  opacity: 0.6;
-  transform: none;
-  box-shadow: none;
-}
+/* 已移除：通知管理面板样式（功能已迁移） */
 
 /* ==================== 响应式设计 ==================== */
 @media (max-width: 1200px) {
-  .stats-cards {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
   .review-modal-body {
     flex-direction: column;
   }
@@ -2165,27 +1244,6 @@ onUnmounted(() => {
 }
 
 @media (max-width: 768px) {
-  .stats-cards {
-    grid-template-columns: 1fr;
-  }
-  
-  .sidebar {
-    width: 200px;
-  }
-  
-  .main-content {
-    margin-left: 200px;
-  }
-  
-  .stat-icon {
-    font-size: 36px;
-    margin-right: 16px;
-  }
-  
-  .stat-value {
-    font-size: 24px;
-  }
-  
   .review-modal-content {
     max-width: 100%;
     max-height: 100vh;

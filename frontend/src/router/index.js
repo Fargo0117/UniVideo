@@ -43,11 +43,31 @@ const router = createRouter({
       meta: { hideNavbar: false }
     },
     {
-      // 管理员审核后台
+      // 管理后台（嵌套路由）
       path: '/admin',
-      name: 'admin',
-      component: () => import('../views/AdminAudit.vue'),
-      meta: { hideNavbar: true }
+      component: () => import('../views/AdminLayout.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true, hideNavbar: true },
+      children: [
+        {
+          path: '',
+          redirect: '/admin/dashboard'
+        },
+        {
+          path: 'dashboard',
+          name: 'admin-dashboard',
+          component: () => import('../views/AdminDashboard.vue')
+        },
+        {
+          path: 'audit',
+          name: 'admin-audit',
+          component: () => import('../views/AdminAudit.vue')
+        },
+        {
+          path: 'users',
+          name: 'admin-users',
+          component: () => import('../views/AdminUsers.vue')
+        }
+      ]
     },
     {
       // 个人主页
@@ -71,6 +91,29 @@ const router = createRouter({
       meta: { hideNavbar: false, requiresAuth: true }
     }
   ]
+})
+
+// 路由守卫：权限验证
+router.beforeEach((to, from, next) => {
+  // 检查是否需要登录
+  if (to.meta.requiresAuth) {
+    const userId = localStorage.getItem('user_id')
+    if (!userId) {
+      next('/login')
+      return
+    }
+    
+    // 检查是否需要管理员权限
+    if (to.meta.requiresAdmin) {
+      const role = localStorage.getItem('role')
+      if (role !== 'admin') {
+        next('/')
+        return
+      }
+    }
+  }
+  
+  next()
 })
 
 export default router

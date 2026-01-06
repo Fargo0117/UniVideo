@@ -26,6 +26,7 @@ class User(db.Model):
     nickname = db.Column(db.String(50), nullable=False, comment='用户昵称')
     role = db.Column(db.String(20), nullable=False, default='user', comment='角色: user/admin')
     avatar = db.Column(db.String(255), default='', comment='头像路径')
+    status = db.Column(db.SmallInteger, default=1, nullable=False, comment='用户状态: 0=封禁/停用, 1=正常')
     created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='注册时间')
     
     # 关系定义：一个用户可以上传多个视频
@@ -134,6 +135,7 @@ class User(db.Model):
             'nickname': self.nickname,
             'role': self.role,
             'avatar': self.avatar,
+            'status': self.status,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
     

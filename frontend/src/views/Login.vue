@@ -13,15 +13,19 @@ const router = useRouter()
 const username = ref('')
 const password = ref('')
 const loading = ref(false)
+const errorMessage = ref('')
 
 /**
  * 处理登录请求
  * 调用后端登录接口，成功后存储用户信息并跳转
  */
 const handleLogin = async () => {
+  // 清空之前的错误信息
+  errorMessage.value = ''
+  
   // 表单验证
   if (!username.value || !password.value) {
-    alert('请输入用户名和密码')
+    errorMessage.value = '请输入用户名和密码'
     return
   }
 
@@ -44,8 +48,7 @@ const handleLogin = async () => {
     router.push('/')
   } catch (error) {
     // 显示错误信息（后端返回格式为 { code, msg, data }）
-    const message = error.response?.data?.msg || '登录失败，请检查用户名和密码'
-    alert(message)
+    errorMessage.value = error.response?.data?.msg || '登录失败，请检查用户名和密码'
   } finally {
     loading.value = false
   }
@@ -53,8 +56,13 @@ const handleLogin = async () => {
 </script>
 
 <template>
-  <div class="login-container">
-    <div class="login-card">
+  <div class="auth-container">
+    <div class="auth-card">
+      <!-- Logo 区域 -->
+      <div class="logo-area">
+        <h1 class="logo-text">UniVideo</h1>
+      </div>
+      
       <h2 class="title">用户登录</h2>
       
       <div class="form-group">
@@ -65,6 +73,7 @@ const handleLogin = async () => {
           type="text"
           placeholder="请输入学号或用户名"
           @keyup.enter="handleLogin"
+          @input="errorMessage = ''"
         />
       </div>
 
@@ -76,7 +85,13 @@ const handleLogin = async () => {
           type="password"
           placeholder="请输入密码"
           @keyup.enter="handleLogin"
+          @input="errorMessage = ''"
         />
+      </div>
+
+      <!-- 错误提示 -->
+      <div v-if="errorMessage" class="error-message">
+        {{ errorMessage }}
       </div>
 
       <button 
@@ -96,30 +111,60 @@ const handleLogin = async () => {
 </template>
 
 <style scoped>
-/* 页面容器 - 全屏居中显示 */
-.login-container {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #f5f5f5;
+/* 入场动画 */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-/* 登录卡片样式 */
-.login-card {
+/* 全局背景 */
+.auth-container {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #f4f5f7;
+  padding: 20px;
+}
+
+/* 登录/注册卡片 */
+.auth-card {
   width: 400px;
-  padding: 40px;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  padding: 40px 30px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(255, 82, 82, 0.08);
+  animation: slideUp 0.5s ease-out;
+}
+
+/* Logo 区域 */
+.logo-area {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.logo-text {
+  color: #FF5252;
+  font-size: 32px;
+  font-weight: bold;
+  margin: 0;
+  letter-spacing: 1px;
 }
 
 /* 标题样式 */
 .title {
   text-align: center;
-  color: #333;
+  color: #FF5252;
+  font-weight: bold;
+  font-size: 28px;
   margin-bottom: 30px;
-  font-size: 24px;
+  margin-top: 0;
 }
 
 /* 表单组样式 */
@@ -132,43 +177,65 @@ const handleLogin = async () => {
   margin-bottom: 8px;
   color: #666;
   font-size: 14px;
+  font-weight: 500;
 }
 
 .form-group input {
   width: 100%;
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  height: 46px;
+  padding: 0 14px;
+  background: #f9f9f9;
+  border: 1px solid #eee;
+  border-radius: 6px;
   font-size: 14px;
   box-sizing: border-box;
-  transition: border-color 0.3s;
+  transition: all 0.3s ease;
 }
 
 .form-group input:focus {
   outline: none;
-  border-color: #409eff;
+  background: #ffffff;
+  border: 2px solid #FF5252;
 }
 
-/* 提交按钮样式 */
+/* 错误提示 */
+.error-message {
+  color: #FF5252;
+  font-size: 12px;
+  margin-top: -10px;
+  margin-bottom: 10px;
+  padding-left: 2px;
+}
+
+/* 提交按钮 */
 .submit-btn {
   width: 100%;
-  padding: 12px;
-  background-color: #409eff;
-  color: #fff;
+  height: 46px;
+  background: linear-gradient(45deg, #FF5252, #FF7676);
+  color: #ffffff;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 16px;
+  font-weight: bold;
   cursor: pointer;
-  transition: background-color 0.3s;
+  transition: all 0.3s ease;
+  margin-top: 10px;
 }
 
-.submit-btn:hover {
-  background-color: #66b1ff;
+.submit-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 82, 82, 0.3);
+}
+
+.submit-btn:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .submit-btn:disabled {
-  background-color: #a0cfff;
+  background: #cccccc;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 /* 底部链接样式 */
@@ -180,11 +247,13 @@ const handleLogin = async () => {
 }
 
 .link-text a {
-  color: #409eff;
+  color: #666;
   text-decoration: none;
+  transition: all 0.3s ease;
 }
 
 .link-text a:hover {
+  color: #FF5252;
   text-decoration: underline;
 }
 </style>
