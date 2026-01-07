@@ -94,6 +94,63 @@ def get_stats():
         }), 500
 
 
+@admin_bp.route('/stats/trend', methods=['GET'])
+def get_stats_trend():
+    """
+    获取最近7天的数据趋势接口
+    返回: 最近7天每天的新增用户数和新增视频数
+    """
+    try:
+        # 获取最近7天的日期范围
+        today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        seven_days_ago = today - timedelta(days=6)  # 包括今天共7天
+        
+        # 初始化结果数组（7天）
+        dates = []
+        new_users_data = []
+        new_videos_data = []
+        
+        # 遍历最近7天，统计每天的新增数据
+        for i in range(7):
+            # 计算当前日期
+            current_date = seven_days_ago + timedelta(days=i)
+            next_date = current_date + timedelta(days=1)
+            
+            # 格式化日期字符串（用于返回）
+            date_str = current_date.strftime('%m-%d')
+            dates.append(date_str)
+            
+            # 统计当天新增用户数（按 created_at 筛选）
+            users_count = User.query.filter(
+                User.created_at >= current_date,
+                User.created_at < next_date
+            ).count()
+            new_users_data.append(users_count)
+            
+            # 统计当天新增视频数（按 created_at 筛选，包括所有状态的视频）
+            videos_count = Video.query.filter(
+                Video.created_at >= current_date,
+                Video.created_at < next_date
+            ).count()
+            new_videos_data.append(videos_count)
+        
+        return jsonify({
+            'code': 200,
+            'msg': '获取成功',
+            'data': {
+                'dates': dates,
+                'new_users': new_users_data,
+                'new_videos': new_videos_data
+            }
+        }), 200
+    
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': f'服务器错误: {str(e)}'
+        }), 500
+
+
 @admin_bp.route('/manage/list', methods=['GET'])
 def get_video_list():
     """
@@ -226,13 +283,14 @@ def audit_video(video_id):
                 'msg': f'该视频当前状态为"{current_status}"，无法重复审核'
             }), 400
         
-        # 根据 action 设置视频状态
+        # 根据 action 设置视频状态并发送对应通知
         if action == 'approve':
-            video.status = Video.STATUS_PUBLISHED  # 通过审核
+            # 审核通过：状态置为已发布
+            video.status = Video.STATUS_PUBLISHED
             result_msg = '审核通过，视频已发布'
             # 创建通知：视频审核通过
             notification = Notification(
-                title='视频审核结果',
+                title='审核通过',
                 content=f'您的视频《{video.title}》已通过审核并发布',
                 msg_type=Notification.MSG_TYPE_AUDIT,
                 related_link=f'/video/{video.id}',
@@ -241,22 +299,25 @@ def audit_video(video_id):
             )
             db.session.add(notification)
         else:  # action == 'reject'
-            video.status = Video.STATUS_REJECTED   # 驳回
+            # 审核驳回：状态置为已驳回
+            video.status = Video.STATUS_REJECTED
             result_msg = '视频已驳回'
-            # 获取驳回理由
-            reason = data.get('reason', '')
-            reject_content = f'您的视频《{video.title}》未通过审核'
-            if reason:
-                reject_content += f'，驳回理由：{reason}'
+            # 获取驳回理由（可选）
+            reason = (data.get('reason') or '').strip()
+            reason_text = reason if reason else '内容不符合规范'
+            # 组装驳回通知内容
+            reject_content = (
+                f'您的视频《{video.title}》未通过审核。原因：{reason_text}'
+            )
             # 创建通知：视频审核驳回
             notification = Notification(
-                title='视频审核结果',
+                title='审核驳回',
                 content=reject_content,
                 msg_type=Notification.MSG_TYPE_AUDIT,
                 related_link='/upload',  # 驳回后引导用户重新上传
                 user_id=video.user_id,
                 video_id=video.id,
-                extra_data=json.dumps({'reason': reason}) if reason else None
+                extra_data=json.dumps({'reason': reason_text}) if reason_text else None
             )
             db.session.add(notification)
         
@@ -362,7 +423,7 @@ def send_notification():
         - target_username (可选): 接收用户名，如果为空则视为群发/广播（系统通知，所有用户可见）
         - title: 消息标题
         - content: 消息正文
-        - msg_type (可选): 消息类型，默认为 'system'，可选值: 'system', 'audit', 'interaction'
+        - msg_type (可选): 消息类型，默认为 'system'，可选值: 'system', 'audit'
         - related_link (可选): 关联链接
     返回: 发送结果
     """
@@ -397,8 +458,8 @@ def send_notification():
                 'msg': '缺少必填字段：content'
             }), 400
         
-        # 验证消息类型
-        valid_types = [Notification.MSG_TYPE_SYSTEM, Notification.MSG_TYPE_AUDIT, Notification.MSG_TYPE_INTERACTION]
+        # 验证消息类型（暂时只支持 system 和 audit，interaction 功能暂未实现）
+        valid_types = [Notification.MSG_TYPE_SYSTEM, Notification.MSG_TYPE_AUDIT]
         if msg_type not in valid_types:
             return jsonify({
                 'code': 400,
@@ -666,9 +727,15 @@ def get_users():
         # 构建查询
         query = User.query
         
-        # 关键词搜索（用户名模糊匹配）
+        # 关键词搜索（支持用户名和昵称模糊匹配）
         if keyword:
-            query = query.filter(User.username.like(f'%{keyword}%'))
+            from sqlalchemy import or_
+            query = query.filter(
+                or_(
+                    User.username.like(f'%{keyword}%'),
+                    User.nickname.like(f'%{keyword}%')
+                )
+            )
         
         # 按创建时间倒序排列
         query = query.order_by(User.created_at.desc())
@@ -680,8 +747,14 @@ def get_users():
             error_out=False
         )
         
-        # 转换为字典列表
-        user_list = [user.to_dict() for user in pagination.items]
+        # 转换为字典列表，并添加视频数统计
+        user_list = []
+        for user in pagination.items:
+            user_dict = user.to_dict()
+            # 统计该用户上传的视频总数
+            video_count = user.videos.count()
+            user_dict['video_count'] = video_count
+            user_list.append(user_dict)
         
         return jsonify({
             'code': 200,
@@ -702,15 +775,16 @@ def get_users():
         }), 500
 
 
-@admin_bp.route('/users/<int:user_id>/status', methods=['POST'])
+@admin_bp.route('/users/<int:id>/status', methods=['POST'])
 @admin_required
-def update_user_status(user_id):
+def update_user_status(id):
     """
     更新用户状态接口
     参数:
-        - user_id: 用户ID（路径参数）
+        - id: 用户ID（路径参数）
         - status: 用户状态（JSON body），1=正常, 0=封禁/停用
     返回: 操作结果
+    逻辑: 更新数据库，并清除相关缓存(如果有)
     """
     try:
         # 获取请求数据
@@ -733,7 +807,7 @@ def update_user_status(user_id):
             }), 400
         
         # 查询用户
-        user = User.query.get(user_id)
+        user = User.query.get(id)
         if not user:
             return jsonify({
                 'code': 404,

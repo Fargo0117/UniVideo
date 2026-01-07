@@ -54,6 +54,10 @@ const currentUserId = localStorage.getItem('user_id')
 // ArtPlayer 实例
 const art = ref(null)
 
+// Toast 提示
+const showToast = ref(false)
+const toastMessage = ref('')
+
 // ==================== 工具函数 ====================
 
 /**
@@ -431,6 +435,52 @@ const goToVideo = (videoId) => {
 }
 
 /**
+ * 显示 Toast 提示
+ * @param {string} message - 提示消息
+ */
+const showToastMessage = (message) => {
+  toastMessage.value = message
+  showToast.value = true
+  setTimeout(() => {
+    showToast.value = false
+  }, 2000)
+}
+
+/**
+ * 分享功能：复制链接到剪贴板
+ */
+const handleShare = async () => {
+  try {
+    const url = window.location.href
+    await navigator.clipboard.writeText(url)
+    showToastMessage('链接已复制，快去分享吧！')
+  } catch (err) {
+    console.error('复制失败:', err)
+    // 降级方案：使用传统方法
+    try {
+      const textArea = document.createElement('textarea')
+      textArea.value = window.location.href
+      textArea.style.position = 'fixed'
+      textArea.style.left = '-999999px'
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      showToastMessage('链接已复制，快去分享吧！')
+    } catch (fallbackErr) {
+      alert('复制失败，请手动复制链接：' + window.location.href)
+    }
+  }
+}
+
+/**
+ * 检查作者是否被封禁
+ */
+const isAuthorBanned = computed(() => {
+  return video.value?.author?.status === 0
+})
+
+/**
  * 初始化 ArtPlayer 播放器
  */
 const initPlayer = () => {
@@ -528,8 +578,8 @@ const initPageData = async () => {
   fetchFollowStatus()  // 获取当前用户对UP主的关注状态
   fetchComments()
   
-  // 视频数据加载完成后初始化播放器
-  if (video.value) {
+  // 视频数据加载完成后初始化播放器（仅当作者未被封禁时）
+  if (video.value && video.value.author?.status !== 0) {
     initPlayer()
   }
 }
@@ -588,8 +638,17 @@ watch(() => route.params.id, (newId, oldId) => {
         </section>
 
         <!-- ArtPlayer 视频播放器 -->
-        <section class="player-wrapper">
+        <section class="player-wrapper" v-if="!isAuthorBanned">
           <div id="artplayer-app" class="artplayer-container"></div>
+        </section>
+
+        <!-- 墓碑占位：用户被封禁时显示 -->
+        <section v-else class="tombstone-overlay">
+          <div class="tombstone-content">
+            <div class="tombstone-icon">🚫</div>
+            <h2 class="tombstone-title">该视频不可见</h2>
+            <p class="tombstone-message">创作者已被封禁</p>
+          </div>
         </section>
 
         <!-- 工具栏：点赞、收藏、分享 -->
@@ -616,20 +675,20 @@ watch(() => route.params.id, (newId, oldId) => {
             <span class="count">{{ collectionsCount }}</span>
           </button>
 
-          <button class="toolbar-btn share-btn">
+          <button class="toolbar-btn share-btn" @click="handleShare">
             <span class="icon">🔗</span>
             <span class="text">分享</span>
           </button>
         </section>
 
         <!-- 视频简介 -->
-        <section class="video-desc" v-if="video.description">
+        <section class="video-desc" v-if="video.description && !isAuthorBanned">
           <h3 class="desc-title">视频简介</h3>
           <p class="desc-content">{{ video.description }}</p>
         </section>
 
         <!-- 评论区 -->
-        <section class="comment-section">
+        <section class="comment-section" v-if="!isAuthorBanned">
         <h2 class="section-title">评论区 ({{ comments.length }})</h2>
         
         <!-- 主评论输入框 -->
@@ -826,6 +885,13 @@ watch(() => route.params.id, (newId, oldId) => {
         </div>
       </aside>
     </main>
+
+    <!-- Toast 提示 -->
+    <transition name="toast-fade">
+      <div v-if="showToast" class="toast-container">
+        <div class="toast-message">{{ toastMessage }}</div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -1689,5 +1755,75 @@ watch(() => route.params.id, (newId, oldId) => {
   .rec-cover {
     width: 100%;
   }
+}
+
+/* ==================== 墓碑占位样式 ==================== */
+.tombstone-overlay {
+  background: #f5f5f5;
+  border-radius: 4px;
+  min-height: 450px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.tombstone-content {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.tombstone-icon {
+  font-size: 80px;
+  margin-bottom: 20px;
+  opacity: 0.6;
+}
+
+.tombstone-title {
+  font-size: 20px;
+  font-weight: 500;
+  color: #666;
+  margin: 0 0 12px 0;
+}
+
+.tombstone-message {
+  font-size: 14px;
+  color: #999;
+  margin: 0;
+}
+
+/* ==================== Toast 提示样式 ==================== */
+.toast-container {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.toast-message {
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 6px;
+  font-size: 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  white-space: nowrap;
+}
+
+.toast-fade-enter-active,
+.toast-fade-leave-active {
+  transition: all 0.3s ease;
+}
+
+.toast-fade-enter-from {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-20px);
+}
+
+.toast-fade-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-20px);
 }
 </style>

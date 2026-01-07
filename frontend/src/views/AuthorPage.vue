@@ -77,6 +77,13 @@ const getStatusClass = (status) => {
   return classMap[status] || ''
 }
 
+/**
+ * 检查作者是否被封禁
+ */
+const isAuthorBanned = computed(() => {
+  return author.value?.status === 0
+})
+
 // ==================== API 调用 ====================
 
 /**
@@ -196,9 +203,12 @@ onMounted(() => {
             @error="(e) => e.target.src = 'https://via.placeholder.com/100'"
           />
           <div class="author-details">
-            <h1 class="author-name">{{ author.nickname || '未知用户' }}</h1>
+            <div class="author-name-row">
+              <h1 class="author-name">{{ author.nickname || '未知用户' }}</h1>
+              <span v-if="isAuthorBanned" class="banned-badge">🚫 已封禁</span>
+            </div>
             <p class="author-username">学号：{{ author.username }}</p>
-            <p class="author-stats">
+            <p class="author-stats" v-if="!isAuthorBanned">
               <span class="stat-item">
                 <span class="stat-value">{{ videos.length }}</span>
                 <span class="stat-label">投稿视频</span>
@@ -220,7 +230,7 @@ onMounted(() => {
       </section>
 
       <!-- 投稿视频列表 -->
-      <section class="videos-section">
+      <section class="videos-section" v-if="!isAuthorBanned">
         <h2 class="section-title">TA的投稿 ({{ videos.length }})</h2>
         
         <div v-if="videos.length === 0" class="no-videos">
@@ -258,6 +268,15 @@ onMounted(() => {
               </p>
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- 封禁提示区域 -->
+      <section v-if="isAuthorBanned" class="banned-section">
+        <div class="banned-content">
+          <div class="banned-icon">🚫</div>
+          <h2 class="banned-title">该用户因违反社区规定，已被限制访问</h2>
+          <p class="banned-description">该用户的所有内容已被隐藏，无法查看</p>
         </div>
       </section>
     </main>
@@ -332,11 +351,31 @@ onMounted(() => {
   flex: 1;
 }
 
+.author-name-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
 .author-name {
   font-size: 28px;
   font-weight: 600;
   color: #333;
-  margin: 0 0 8px 0;
+  margin: 0;
+}
+
+.banned-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  background: #fff1f0;
+  color: #ff4d4f;
+  border: 1px solid #ffccc7;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .author-username {
@@ -539,6 +578,41 @@ onMounted(() => {
 
 .follow-text {
   line-height: 1;
+}
+
+/* ==================== 封禁提示区域 ==================== */
+.banned-section {
+  background: #fff;
+  border-radius: 8px;
+  padding: 60px 24px;
+  margin-top: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.banned-content {
+  text-align: center;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.banned-icon {
+  font-size: 80px;
+  margin-bottom: 24px;
+  opacity: 0.6;
+}
+
+.banned-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 12px 0;
+}
+
+.banned-description {
+  font-size: 14px;
+  color: #999;
+  margin: 0;
+  line-height: 1.6;
 }
 
 /* 响应式设计 */

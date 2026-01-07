@@ -22,7 +22,7 @@ const loading = ref(true)
 const expandedMessages = ref(new Set())
 
 // 筛选状态
-const filterType = ref('all') // 'all', 'unread', 'system', 'audit', 'interaction'
+const filterType = ref('all') // 'all', 'unread', 'system', 'audit'
 
 // ==================== 计算属性 ====================
 
@@ -90,24 +90,17 @@ const formatTime = (isoString) => {
 
 /**
  * 获取消息类型配置
+ * 特别注意：审核类消息通过后端提供的标题区分“审核通过 / 审核驳回”
  */
 const getMessageConfig = (notification) => {
-  const { msg_type, content } = notification
+  const { msg_type, title } = notification
   
-  // 审核类型需要判断是通过还是驳回
+  // 审核类型：优先根据后端设置的标题判断
   if (msg_type === 'audit') {
-    // 通过关键词判断（包含"通过"、"已发布"等为通过，否则为驳回）
-    const isApproved = content.includes('通过') || content.includes('已发布')
+    const titleText = title || ''
+    const isRejected = titleText.includes('驳回')
     
-    if (isApproved) {
-      return {
-        icon: '✅',
-        iconBg: '#52c41a',
-        titleColor: '#52c41a',
-        titleText: '审核通过',
-        iconClass: 'icon-success'
-      }
-    } else {
+    if (isRejected) {
       return {
         icon: '❌',
         iconBg: '#FF5252',
@@ -115,6 +108,15 @@ const getMessageConfig = (notification) => {
         titleText: '审核驳回',
         iconClass: 'icon-error'
       }
+    }
+    
+    // 其他情况统一视为“审核通过”
+    return {
+      icon: '✅',
+      iconBg: '#52c41a',
+      titleColor: '#52c41a',
+      titleText: '审核通过',
+      iconClass: 'icon-success'
     }
   }
   
@@ -129,18 +131,7 @@ const getMessageConfig = (notification) => {
     }
   }
   
-  // 互动通知
-  if (msg_type === 'interaction') {
-    return {
-      icon: '💬',
-      iconBg: '#fa8c16',
-      titleColor: '#262626',
-      titleText: '互动通知',
-      iconClass: 'icon-interaction'
-    }
-  }
-  
-  // 默认
+  // 默认（其他类型，如 interaction 等，暂时不实现）
   return {
     icon: '📢',
     iconBg: '#8c8c8c',
@@ -322,13 +313,6 @@ onMounted(() => {
         @click="filterType = 'audit'"
       >
         审核通知
-      </button>
-      <button 
-        class="filter-btn"
-        :class="{ active: filterType === 'interaction' }"
-        @click="filterType = 'interaction'"
-      >
-        互动通知
       </button>
     </div>
 

@@ -248,7 +248,8 @@ class Video(db.Model):
                 'id': self.author.id,
                 'username': self.author.username,
                 'nickname': self.author.nickname,
-                'avatar': self.author.avatar
+                'avatar': self.author.avatar,
+                'status': self.author.status  # 包含用户状态，用于前端判断是否被封禁
             }
         if self.category:
             data['category'] = self.category.to_dict()

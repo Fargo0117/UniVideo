@@ -1,8 +1,161 @@
-# 忽略 Qoder 的本地配置与缓存目录（仅开发机使用）
-.qoder/
+# ==================== Python 相关 ====================
+# Python 虚拟环境（位于 backend/ 目录下）
+backend/venv/
+venv/
+env/
+ENV/
+.venv
 
-# 忽略本地开发文档（课程设计说明文档，不需要提交到代码仓库）
-开发文档/
+# Python 缓存文件（递归所有目录）
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
 
-# 忽略文档规范模板（指导性资料，不属于项目源代码）
-文档规范/
+# Python 分发/打包
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ==================== Node.js 相关 ====================
+# 前端依赖包（位于 frontend/ 目录下）
+frontend/node_modules/
+node_modules/
+
+# 前端构建输出
+frontend/dist/
+frontend/build/
+dist/
+build/
+
+# Node.js 日志文件
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# ==================== 环境变量和配置 ====================
+# 环境变量文件（可能包含敏感信息，如数据库密码）
+.env
+.env.local
+.env.*.local
+*.env
+
+# ==================== IDE 和编辑器配置 ====================
+# IDE 配置文件（根据团队需要决定是否忽略）
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cursor/
+
+# ==================== 系统文件 ====================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+*~
+
+# ==================== 日志和临时文件 ====================
+# 日志文件
+*.log
+logs/
+*.log.*
+
+# 临时文件
+*.tmp
+*.temp
+.cache/
+*.cache
+
+# ==================== 运行时上传的媒体文件 ====================
+# 注意：这些是用户运行时上传的文件，不应该提交到版本控制
+# 保留目录结构，但忽略所有文件内容
+backend/static/videos/*
+!backend/static/videos/.gitkeep
+backend/static/covers/*
+!backend/static/covers/.gitkeep
+backend/static/avatars/*
+!backend/static/avatars/.gitkeep
+
+# 忽略 static 目录下的测试文件（可选，如果需要保留测试文件可以注释掉）
+backend/static/test.txt
+
+# ==================== 数据库文件 ====================
+# MySQL 数据库导出文件（备份文件，不应该提交）
+*.sql.bak
+*.sql.backup
+*.dump
+*.sql.gz
+*.sql.zip
+
+# SQLite 数据库（测试环境可能使用，如 TestingConfig 中的内存数据库）
+*.db
+*.sqlite
+*.sqlite3
+
+# MySQL 数据目录（如果本地有 MySQL 数据目录）
+mysql_data/
+data/
+
+# 注意：
+# - univideo_db.sql 是数据库初始化脚本，应该保留，不忽略
+# - migrations/ 目录（Flask-Migrate 生成的数据库迁移文件）应该保留，不忽略
+# - MySQL 是服务器型数据库，数据存储在 MySQL 服务器上，不会生成本地文件
+# - 数据库连接信息（用户名、密码）应通过环境变量配置，不要硬编码在代码中
+
+# ==================== 测试和覆盖率 ====================
+# 测试覆盖率报告
+coverage/
+.nyc_output/
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# ==================== 其他 ====================
+# 调试文件
+*.pdb
+
+# 误操作产生的文件（后端不应该有 package-lock.json）
+backend/package-lock.json
+
+# Flask 相关
+instance/
+.webassets-cache
+
+# 压缩文件（如果有）
+*.zip
+*.tar.gz
+*.rar

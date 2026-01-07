@@ -1,8 +1,6 @@
 ---
-name: my-custom-rule
-description: This is a new rule
+alwaysApply: true
 ---
-
 # Overview
 
 Insert overview text here. The agent will only see this should they choose to apply the rule.
@@ -11,4 +9,5 @@ Insert overview text here. The agent will only see this should they choose to ap
 在做完当前任务后要说明你都做了什么。
 尽量按照我的提示词去工作，如果你做了超出提示词外的事情一定要跟我说，检查自己的所作所为，我会判断并选择是否保留
 开发前端时要根据后端代码去实现
-改动后实时更新软件设计说明书
+如果项目有功能方面的改动更新后，要实时更新 开发文档/软件设计说明书.md
+如果更甚有功能已经涉及到需求方面，也需要同步 开发文档/需求分析规格说明书.md

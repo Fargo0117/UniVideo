@@ -178,14 +178,19 @@ def get_video_list():
     - keyword (可选，搜索关键词，模糊查询标题)
     - category_id (可选，用于分类筛选)
     返回: 视频列表（包含作者昵称、分类名、封面URL）
+    逻辑: 必须排除 status=0 (被封禁) 的用户的视频
     """
     try:
         # 获取搜索关键词和分类筛选参数
         keyword = request.args.get('keyword', '').strip()
         category_id = request.args.get('category_id', '').strip()
         
-        # 基础查询：只查询 status=1 (已发布) 的视频
-        query = Video.query.filter_by(status=Video.STATUS_PUBLISHED)
+        # 基础查询：只查询 status=1 (已发布) 的视频，并且排除被封禁用户(status=0)的视频
+        # 使用 join 连接 User 表，过滤用户状态和视频状态
+        query = Video.query.join(User).filter(
+            User.status == 1,  # 用户状态必须为正常(1)
+            Video.status == Video.STATUS_PUBLISHED  # 视频状态必须为已发布(1)
+        )
         
         # 如果提供了搜索关键词，则进行模糊搜索
         if keyword:

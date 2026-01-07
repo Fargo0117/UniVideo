@@ -14,51 +14,17 @@ const stats = ref({
   today_new: 0
 })
 
+// 趋势数据
+const trendData = ref({
+  dates: [],
+  newUsers: [],
+  newVideos: []
+})
+
 const loading = ref(false)
 
 // 图表实例
 let chartInstance = null
-
-/**
- * 生成最近7天的日期数组
- */
-const getLast7Days = () => {
-  const dates = []
-  const today = new Date()
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date(today)
-    date.setDate(date.getDate() - i)
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    dates.push(`${month}-${day}`)
-  }
-  return dates
-}
-
-/**
- * 生成模拟数据（最近7天的新增用户数和新增视频数）
- */
-const generateMockData = () => {
-  const newUsers = []
-  const newVideos = []
-  
-  // 基于总用户数和今日新增数生成合理的模拟数据
-  const baseUsers = stats.value.total_users || 100
-  const baseVideos = stats.value.today_new || 10
-  
-  for (let i = 0; i < 7; i++) {
-    // 新增用户数：在 baseUsers/7 的基础上随机波动 ±30%
-    const avgUsers = Math.max(1, Math.floor(baseUsers / 7))
-    const users = Math.floor(avgUsers * (0.7 + Math.random() * 0.6))
-    newUsers.push(users)
-    
-    // 新增视频数：在 baseVideos 的基础上随机波动 ±40%
-    const videos = Math.floor(baseVideos * (0.6 + Math.random() * 0.8))
-    newVideos.push(videos)
-  }
-  
-  return { newUsers, newVideos }
-}
 
 /**
  * 获取统计数据
@@ -73,13 +39,38 @@ const fetchStats = async () => {
         total_users: response.data.data.total_users || 0,
         today_new: response.data.data.today_new || 0
       }
-      // 更新图表
-      updateChart()
     }
   } catch (err) {
     console.error('获取统计数据失败:', err)
   } finally {
     loading.value = false
+  }
+}
+
+/**
+ * 获取趋势数据（最近7天的新增用户数和新增视频数）
+ */
+const fetchTrendData = async () => {
+  try {
+    const response = await api.get('/admin/stats/trend')
+    if (response.data.code === 200) {
+      trendData.value = {
+        dates: response.data.data.dates || [],
+        newUsers: response.data.data.new_users || [],
+        newVideos: response.data.data.new_videos || []
+      }
+      // 更新图表
+      updateChart()
+    }
+  } catch (err) {
+    console.error('获取趋势数据失败:', err)
+    // 如果获取失败，使用空数据
+    trendData.value = {
+      dates: [],
+      newUsers: [],
+      newVideos: []
+    }
+    updateChart()
   }
 }
 
@@ -107,8 +98,12 @@ const initChart = () => {
 const updateChart = () => {
   if (!chartInstance) return
   
-  const dates = getLast7Days()
-  const { newUsers, newVideos } = generateMockData()
+  // 使用从后端获取的真实数据
+  const dates = trendData.value.dates.length > 0 
+    ? trendData.value.dates 
+    : ['01-01', '01-02', '01-03', '01-04', '01-05', '01-06', '01-07'] // 默认占位
+  const newUsers = trendData.value.newUsers
+  const newVideos = trendData.value.newVideos
   
   const option = {
     tooltip: {
@@ -206,8 +201,13 @@ const handleResize = () => {
   }
 }
 
-onMounted(() => {
-  fetchStats()
+onMounted(async () => {
+  // 并行获取统计数据和趋势数据
+  await Promise.all([
+    fetchStats(),
+    fetchTrendData()
+  ])
+  
   // 延迟初始化图表，确保 DOM 已渲染
   setTimeout(() => {
     initChart()
