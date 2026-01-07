@@ -4,6 +4,7 @@
 """
 from flask import Blueprint, request, jsonify, current_app
 from werkzeug.utils import secure_filename
+from sqlalchemy import or_
 from models import db, User, Video
 import os
 import uuid
@@ -313,6 +314,75 @@ def get_user_info(user_id):
             }
         }), 200
     
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': f'服务器错误: {str(e)}'
+        }), 500
+
+
+@user_bp.route('/search', methods=['GET'])
+def search_users():
+    """
+    根据关键词搜索用户（用户名 / 昵称）
+    参数:
+        - keyword: 搜索关键词
+        - limit: 返回数量上限（默认 20）
+    返回:
+        - data: { list: [ {id, username, nickname, avatar_url, created_at} ] }
+    说明:
+        - 仅返回 status=1 的正常用户
+    """
+    try:
+        keyword = (request.args.get('keyword') or '').strip()
+        limit = request.args.get('limit', 20, type=int)
+
+        # 关键字为空时直接返回空结果，避免全表扫描
+        if not keyword:
+            return jsonify({
+                'code': 200,
+                'msg': 'OK',
+                'data': {
+                    'list': []
+                }
+            }), 200
+
+        # 仅查询正常用户
+        query = User.query.filter(User.status == 1)
+
+        # 按用户名或昵称模糊匹配
+        like_pattern = f'%{keyword}%'
+        query = query.filter(
+            or_(User.username.like(like_pattern),
+                User.nickname.like(like_pattern))
+        )
+
+        # 按注册时间倒序，限制返回数量
+        users = query.order_by(User.created_at.desc()).limit(limit).all()
+
+        result_list = []
+        for user in users:
+            avatar_url = ''
+            if user.avatar:
+                # avatar 字段存的是相对路径，如 avatars/xxx.png
+                avatar_url = f"http://localhost:5001/static/{user.avatar}"
+
+            result_list.append({
+                'id': user.id,
+                'username': user.username,
+                'nickname': user.nickname,
+                'avatar_url': avatar_url,
+                'created_at': user.created_at.isoformat() if user.created_at else None
+            })
+
+        return jsonify({
+            'code': 200,
+            'msg': '搜索成功',
+            'data': {
+                'list': result_list
+            }
+        }), 200
+
     except Exception as e:
         return jsonify({
             'code': 500,

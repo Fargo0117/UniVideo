@@ -5,7 +5,7 @@
  */
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import api from '@/api'
+import api, { searchUsers } from '@/api'
 
 const router = useRouter()
 const route = useRoute()
@@ -14,9 +14,15 @@ const route = useRoute()
 const videos = ref([])
 const loading = ref(true)
 
+// 匹配的用户列表（根据关键词搜索）
+const matchedUsers = ref([])
+const usersLoading = ref(false)
+
 // 搜索和筛选状态
 const searchKeyword = ref('')  // 搜索关键词
 const activeCategoryId = ref('all')  // 当前选中的分类ID
+// 搜索结果类型：'video' | 'user'
+const activeSearchType = ref('video')
 
 /**
  * 获取视频列表（带搜索和筛选功能）
@@ -45,11 +51,37 @@ const fetchVideos = async () => {
 }
 
 /**
+ * 根据关键词搜索用户（用户名 / 昵称）
+ */
+const fetchUsers = async () => {
+  // 仅在有关键字时搜索用户，避免无意义请求
+  const keyword = searchKeyword.value.trim()
+  if (!keyword) {
+    matchedUsers.value = []
+    return
+  }
+
+  usersLoading.value = true
+  try {
+    const response = await searchUsers(keyword, 10)
+    matchedUsers.value = response.data.data?.list || []
+  } catch (error) {
+    console.error('搜索用户失败:', error)
+    matchedUsers.value = []
+  } finally {
+    usersLoading.value = false
+  }
+}
+
+/**
  * 处理导航栏搜索事件
  */
 const handleNavbarSearch = (event) => {
   searchKeyword.value = event.detail.keyword
+  // 新搜索默认展示视频结果
+  activeSearchType.value = 'video'
   fetchVideos()
+  fetchUsers()
 }
 
 /**
@@ -72,6 +104,13 @@ const goToVideo = (videoId) => {
  */
 const goToUpload = () => {
   router.push('/upload')
+}
+
+/**
+ * 跳转到作者主页
+ */
+const goToAuthor = (userId) => {
+  router.push(`/author/${userId}`)
 }
 
 /**
@@ -100,6 +139,7 @@ onMounted(() => {
   }
   
   fetchVideos()
+  fetchUsers()
   
   // 监听来自 NavBar 的事件
   window.addEventListener('navbar-search', handleNavbarSearch)
@@ -118,52 +158,112 @@ onUnmounted(() => {
     <!-- 内容区域 -->
     <main class="content">
 
-      <!-- 加载状态 -->
-      <div v-if="loading" class="loading-state">
-        <p>加载中...</p>
-      </div>
-
-      <!-- 空状态 -->
-      <div v-else-if="videos.length === 0" class="empty-state">
-        <p>暂无视频，快去上传第一个视频吧！</p>
-        <button class="btn btn-primary" @click="goToUpload">上传视频</button>
-      </div>
-
-      <!-- 视频列表 -->
-      <div v-else class="video-grid">
-        <div 
-          v-for="video in videos" 
-          :key="video.id" 
-          class="video-card"
-          @click="goToVideo(video.id)"
+      <!-- 关键词存在时，显示“视频/用户”结果类型切换 -->
+      <div v-if="searchKeyword.trim()" class="search-toggle-bar">
+        <span class="search-label">搜索结果：</span>
+        <button
+          class="search-type-btn"
+          :class="{ active: activeSearchType === 'video' }"
+          @click="activeSearchType = 'video'"
         >
-          <!-- 视频封面 -->
-          <div class="card-cover">
-            <img :src="video.cover_url" :alt="video.title" />
-            <!-- 视频时长（右下角） -->
-            <div class="duration-badge">12:30</div>
-            <!-- 播放量（左下角，带渐变背景） -->
-            <div class="stats-overlay">
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M4 3l8 5-8 5V3z"/>
-              </svg>
-              <span>{{ formatViewCount(video.view_count || 0) }}</span>
-            </div>
-          </div>
-          <!-- 视频信息 -->
-          <div class="card-info">
-            <h3 class="card-title">{{ video.title }}</h3>
-            <div class="card-meta">
-              <svg class="up-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M8 2C4.69 2 2 4.69 2 8s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm1 9H7V7h2v4zm0-5H7V5h2v1z"/>
-              </svg>
-              <span class="author">{{ video.author?.nickname || '未知作者' }}</span>
-              <span class="separator">·</span>
-              <span class="category">{{ video.category?.name || '未分类' }}</span>
+          视频
+        </button>
+        <button
+          class="search-type-btn"
+          :class="{ active: activeSearchType === 'user' }"
+          @click="activeSearchType = 'user'"
+        >
+          用户
+        </button>
+      </div>
+
+      <!-- 关键词匹配的用户列表 -->
+      <section v-if="searchKeyword.trim() && activeSearchType === 'user'" class="user-result-section">
+        <header class="user-result-header">
+          <h2 class="section-title">相关用户</h2>
+          <span class="section-subtitle">
+            {{ matchedUsers.length > 0 ? `找到 ${matchedUsers.length} 位相关用户` : '暂无匹配用户' }}
+          </span>
+        </header>
+
+        <div v-if="usersLoading" class="loading-state small">
+          <p>正在搜索用户...</p>
+        </div>
+        <div v-else-if="matchedUsers.length === 0" class="empty-state small">
+          <p>没有找到相关用户</p>
+        </div>
+        <div v-else class="user-result-list">
+          <div
+            v-for="user in matchedUsers"
+            :key="user.id"
+            class="user-card"
+            @click="goToAuthor(user.id)"
+          >
+            <img
+              class="user-avatar"
+              :src="user.avatar_url || 'https://via.placeholder.com/48'"
+              :alt="user.nickname || user.username"
+              @error="(e) => e.target.src = 'https://via.placeholder.com/48'"
+            />
+            <div class="user-info">
+              <div class="user-name-row">
+                <span class="user-nickname">{{ user.nickname || '用户' }}</span>
+                <span class="user-username">学号：{{ user.username }}</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
+
+      <!-- 视频结果区域：在没有关键词时，或选择“视频”模式时展示 -->
+      <section v-if="!searchKeyword.trim() || activeSearchType === 'video'">
+        <!-- 加载状态 -->
+        <div v-if="loading" class="loading-state">
+          <p>加载中...</p>
+        </div>
+
+        <!-- 空状态 -->
+        <div v-else-if="videos.length === 0" class="empty-state">
+          <p>暂无视频，快去上传第一个视频吧！</p>
+          <button class="btn btn-primary" @click="goToUpload">上传视频</button>
+        </div>
+
+        <!-- 视频列表 -->
+        <div v-else class="video-grid">
+          <div 
+            v-for="video in videos" 
+            :key="video.id" 
+            class="video-card"
+            @click="goToVideo(video.id)"
+          >
+            <!-- 视频封面 -->
+            <div class="card-cover">
+              <img :src="video.cover_url" :alt="video.title" />
+              <!-- 视频时长（右下角） -->
+              <div class="duration-badge">12:30</div>
+              <!-- 播放量（左下角，带渐变背景） -->
+              <div class="stats-overlay">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M4 3l8 5-8 5V3z"/>
+                </svg>
+                <span>{{ formatViewCount(video.view_count || 0) }}</span>
+              </div>
+            </div>
+            <!-- 视频信息 -->
+            <div class="card-info">
+              <h3 class="card-title">{{ video.title }}</h3>
+              <div class="card-meta">
+                <svg class="up-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M8 2C4.69 2 2 4.69 2 8s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm1 9H7V7h2v4zm0-5H7V5h2v1z"/>
+                </svg>
+                <span class="author">{{ video.author?.nickname || '未知作者' }}</span>
+                <span class="separator">·</span>
+                <span class="category">{{ video.category?.name || '未分类' }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 </template>
@@ -182,6 +282,124 @@ onUnmounted(() => {
   margin: 0 auto;
 }
 
+/* 搜索结果类型切换条 */
+.search-toggle-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.search-label {
+  font-size: 14px;
+  color: #666;
+}
+
+.search-type-btn {
+  padding: 4px 12px;
+  font-size: 13px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: #f5f5f5;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.search-type-btn:hover {
+  background: #e9e9e9;
+}
+
+.search-type-btn.active {
+  background: #FF5252;
+  color: #fff;
+  border-color: #FF5252;
+  box-shadow: 0 0 0 1px rgba(255, 82, 82, 0.2);
+}
+
+/* ==================== 用户搜索结果区域 ==================== */
+.user-result-section {
+  margin-bottom: 16px;
+  padding: 16px 20px;
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04);
+}
+
+.user-result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #18191C;
+}
+
+.section-subtitle {
+  font-size: 13px;
+  color: #8c8c8c;
+}
+
+.user-result-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.user-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: #f5f5f5;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.user-card:hover {
+  background: rgba(255, 82, 82, 0.06);
+  box-shadow: 0 2px 10px rgba(255, 82, 82, 0.08);
+  transform: translateY(-1px);
+}
+
+.user-card .user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(255, 82, 82, 0.35);
+}
+
+.user-card .user-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.user-name-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.user-nickname {
+  font-size: 14px;
+  font-weight: 600;
+  color: #18191C;
+}
+
+.user-username {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
 /* ==================== 加载和空状态 ==================== */
 .loading-state,
 .empty-state {
@@ -189,6 +407,11 @@ onUnmounted(() => {
   padding: 80px 20px;
   color: #999;
   font-size: 15px;
+}
+
+.loading-state.small,
+.empty-state.small {
+  padding: 24px 8px;
 }
 
 .loading-state::before {

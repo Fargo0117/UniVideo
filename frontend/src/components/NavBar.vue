@@ -259,7 +259,7 @@ onUnmounted(() => {
           <input 
             v-model="searchKeyword" 
             type="text" 
-            placeholder="搜索视频标题..."
+            placeholder="输入关键词，搜索视频和用户..."
             @keyup.enter="handleSearch"
             @focus="isSearchFocused = true"
             @blur="isSearchFocused = false"

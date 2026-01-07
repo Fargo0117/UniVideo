@@ -91,5 +91,16 @@ export const getFollowStatus = (targetUserId, currentUserId) => {
   })
 }
 
+/**
+ * 关键字搜索用户（用户名 / 昵称）
+ * @param {string} keyword - 搜索关键词
+ * @param {number} limit - 返回数量上限（默认 20）
+ */
+export const searchUsers = (keyword, limit = 20) => {
+  return api.get('/users/search', {
+    params: { keyword, limit }
+  })
+}
+
 // 导出配置好的 axios 实例
 export default api
